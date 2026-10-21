@@ -17,7 +17,7 @@ Implementation notes and the phase-1/phase-2 plan are in [`FORK.md`](FORK.md). C
 
 ### Supported hardware
 
-**XIAO ESP32-C5 only.** The main sketch's display code now targets the TFT, so the XIAO S3 / C6 / C3 OLED builds that upstream supports do not work from this fork — use [upstream](https://github.com/hamspiced/piglet) for those.
+**XIAO ESP32-C5 only.** The OLED driver has been replaced by the TFT driver, and only the C5 pin map has TFT pins, so an S3 / C6 / C3 build from this fork has no working display. Use [upstream](https://github.com/hamspiced/piglet) for those boards.
 
 ### Tested so far (2026-10-21)
 
