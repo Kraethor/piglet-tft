@@ -40,15 +40,21 @@ leaves that code alone and runs it on the TFT through a small shim:
 
 - **`TftCompat.h`** defines `PigletDisplay`, an `Arduino_Canvas` of 128×64 that
   adds the three SSD1306-only calls the pages use: `clearDisplay()` →
-  `fillScreen(black)`, `display()` → `flush()`, and `ssd1306_command()` → no-op.
+  `fillScreen(black)`, `display()` → a 2× scaled flush, and `ssd1306_command()` → no-op.
   `SSD1306_WHITE` / `SSD1306_BLACK` map to RGB565 white / black.
-- The canvas is flushed to a region **centred on the 240×320 panel**
-  (x = 56, y = 128), leaving black margins.
+- The panel runs in **landscape, 320×240** (`gfx->setRotation(1)`, or 3 with
+  `rotateScreen180`). `display()` calls `flushScaled()` rather than
+  `Arduino_Canvas::flush()`: each canvas pixel is written as a 2×2 block, one
+  scaled row band per transfer, so the page fills **256×128 in the upper-left
+  corner** (`TFT_CANVAS_SCALE`, `TFT_PAGE_W/H`). The NEXT button sits to its
+  right, and the 320×112 strip below both is free for future status lines.
+- Each redraw sends four times the pixels of a 1:1 flush; on hardware the pig
+  animation and page changes still look smooth (2026-10-21).
 - Everything else (`drawRect`, `print`, `setTextSize`, `getTextBounds`, …) is
   inherited from Arduino_GFX, so the page code compiles unchanged.
 
-**RAM:** the 128×64×16 bpp canvas is about 16 KB, which fits comfortably without
-PSRAM. The fork is built and run with PSRAM disabled.
+**RAM:** the 128×64×16 bpp canvas is about 16 KB, plus a 1 KB row band for the
+scaled flush, which fits comfortably without PSRAM. The fork is built and run with PSRAM disabled.
 
 ## Shared SPI bus
 
@@ -83,8 +89,12 @@ Arduino_GFX colours are RGB565 (`RGB565_BLACK`, `RGB565_WHITE`, …).
 ## Touch input
 
 - **`TouchInput.cpp`** polls the XPT2046 and reports whether the **NEXT** button
-  zone (bottom-right, 86×60 px at x = 150, y = 256) is being touched, with a
-  minimum pressure of z ≥ 300.
+  zone (upper-right, 60×128 px at x = 260, y = 0) is being touched, with a
+  minimum pressure of z ≥ 300. The zone isn't bounded at the panel's right and
+  top edges, because uncalibrated readings can map slightly past them.
+- **Touch rotation follows the panel:** `touch.setRotation(gfx->getRotation())`.
+  XPT2046_Touchscreen's rotations line up with Arduino_GFX's — portrait 0 and
+  landscape 1 are both verified on hardware.
 - **Uncalibrated:** raw readings are mapped linearly from 300–3800 to panel
   pixels. That is accurate enough for one large corner button. Smaller phase-2
   touch targets will need a two-point calibration, with raw min/max kept on the
@@ -125,15 +135,17 @@ panel is touched. *Not yet tested on hardware.*
 - [x] Touch NEXT button driving the gesture state machine, with a page-specific hint line.
 - [x] Built and flashed on a XIAO ESP32-C5 (core 3.3.10); TFT pages and all
       touch gestures tested on the device (2026-10-21).
-- [ ] SD logging, GPS fix, WiGLE / WDGoWars / Wardrift uploads — not yet tested on the fork.
+- [x] Uploads work on the fork, with PSRAM disabled (2026-10-21; service not recorded).
+- [x] Landscape layout with 2× pages and the button upper right; touch works in
+      landscape (2026-10-21).
+- [ ] SD logging and GPS fix — not yet confirmed; no GPS fix seen yet on the fork.
 - [ ] Touch wake from deep sleep — not yet tested.
-- [ ] `rotateScreen180` — not yet tested. It rotates the page canvas; the NEXT
-      button and the touch mapping do not appear to account for rotation (from
-      reading the code, not tested).
+- [ ] `rotateScreen180` — not yet tested. It now turns the whole panel (rotation
+      3), and the touch mapping follows.
 
 ## Phase 2 (planned)
 
-Redesign the pages for the full 240×320 colour panel instead of the centred
+Redesign the pages for the full 320×240 colour panel instead of the 2×-scaled
 128×64 canvas.
 
 - A full-screen 16 bpp canvas is about 150 KB. That likely needs PSRAM, or

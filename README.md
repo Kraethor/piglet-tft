@@ -7,8 +7,8 @@ Everything else — Wi-Fi scanning, GPS, WiGLE CSV logging to SD, the web UI, up
 
 ## What's different from upstream
 
-- **Display:** ILI9341 TFT via [Arduino_GFX](https://github.com/moononournation/Arduino_GFX), sharing the SD card's SPI bus. The stock pages are drawn unchanged into a 128×64 area centred on the screen (phase 1); a full-screen colour layout is planned (phase 2).
-- **Input:** the physical button is replaced by an on-screen **NEXT** button in the bottom-right corner. It drives the same single / double / triple / long-press gestures, and a hint line under NEXT shows what the current page's extra gestures do.
+- **Display:** ILI9341 TFT via [Arduino_GFX](https://github.com/moononournation/Arduino_GFX), sharing the SD card's SPI bus. The panel runs in landscape (320×240). The stock 128×64 pages are drawn unchanged at 2× size (256×128) in the upper-left corner (phase 1), leaving a strip across the bottom for future status lines; a full-screen colour layout is planned (phase 2).
+- **Input:** the physical button is replaced by an on-screen **NEXT** button in the upper-right corner, beside the page. It drives the same single / double / triple / long-press gestures, and a two-line hint under NEXT shows what the current page's extra gestures do.
 - **Faster taps:** pages without multi-tap gestures change on release, with no double-tap wait.
 - **Two inherited button bugs fixed:** the status page's play/pause icon now shows a double-tap pause, and triple-tap is reachable (the multi-press window now runs from the latest tap, not the first).
 - **Wake from deep sleep** moves from the button to a screen touch (the XPT2046 IRQ line).
@@ -25,7 +25,9 @@ Implementation notes and the phase-1/phase-2 plan are in [`FORK.md`](FORK.md). C
 |---|---|
 | TFT draws all pages | ✅ Tested on hardware |
 | Touch button: tap, double / triple tap, hold on the mesh page | ✅ Tested on hardware |
-| SD logging, GPS fix, WiGLE / WDGoWars / Wardrift uploads | ⏳ Not yet tested on the fork |
+| Uploads | ✅ Working on hardware (service not recorded) |
+| SD logging, GPS fix | ⏳ Not yet confirmed — no GPS fix seen yet on the fork |
+| Landscape layout, 2× pages, touch in landscape | ✅ Tested on hardware |
 | Touch wake from deep sleep, `rotateScreen180` | ⏳ Not yet tested on the fork |
 | Mesh Node / Core operation with a coordinator | ⏳ Not yet tested (switching modes works) |
 
@@ -48,7 +50,7 @@ Implementation notes and the phase-1/phase-2 plan are in [`FORK.md`](FORK.md). C
 - Optimized for mobile wardriving or warWalking!
 - **ESP-Now Mesh Node mode** — pair with a coordinator device for multi-node wardriving
 - **Mesh auto-start on boot** — configure `meshModeOnBoot` to automatically enter Core or Node mode after uploads complete, bypassing the AP window
-- **Screen rotation** — `rotateScreen180=true` flips the display 180° *(not yet tested on the TFT fork)*
+- **Screen rotation** — `rotateScreen180=true` turns the whole panel 180°, touch button and touch mapping included *(not yet tested on the TFT fork)*
 - **Auto-start wardriving after uploads** — set `autoStartAfterUpload=true` to disconnect from home Wi-Fi immediately after boot uploads complete and begin scanning without delay
 
 
@@ -122,7 +124,7 @@ The pin map lives in `Arduino Files/Piglet/PinMapDefs.h` and is selected automat
 
 ## Touch Button
 
-The **NEXT** button sits in the bottom-right corner of the screen. The small line under it is a reminder of the current page's extra gestures.
+The **NEXT** button runs down the upper-right corner of the screen, beside the page. The two small lines under it are a reminder of the current page's extra gestures.
 
 ### Gestures
 
@@ -141,12 +143,12 @@ Multi-tap taps must each follow the previous one within 350 ms. Only the Status 
 
 | Page | Name | What it shows | Hint under NEXT | Scanning |
 |---|---|---|---|---|
-| 0 | **Status** | Play/pause icon, GPS indicator, STA and SD state, 2.4 / 5 GHz counts, battery, speed, IP or AP countdown, upload progress | `2x: pause` / `2x: resume` | ✅ Active unless paused |
-| 1 | **Networks** | 2.4 GHz, 5 GHz and total network counts | `hold: sleep` | ✅ Active |
-| 2 | **Navigation** | Compass arrow, heading, speed; `No Fix` and satellite dots without a fix | `hold: sleep` | ✅ Active |
-| 3 | **Paused** | `Scan paused` | `hold: sleep` | ❌ Stopped while on this page |
-| 4 | **Pig** | Walking pig animation 🐷 | `2x oink 3x sq` | ✅ Active |
-| 5 | **Mesh** | Node: link state, coordinator MAC, channel range, ESP-Now channel, Found count. Core: node count and list, GPS state | `hold: core` / `hold: node` | ↔ Forwarded via ESP-Now |
+| 0 | **Status** | Play/pause icon, GPS indicator, STA and SD state, 2.4 / 5 GHz counts, battery, speed, IP or AP countdown, upload progress | `2x:` `pause` / `resume` | ✅ Active unless paused |
+| 1 | **Networks** | 2.4 GHz, 5 GHz and total network counts | `hold:` `sleep` | ✅ Active |
+| 2 | **Navigation** | Compass arrow, heading, speed; `No Fix` and satellite dots without a fix | `hold:` `sleep` | ✅ Active |
+| 3 | **Paused** | `Scan paused` | `hold:` `sleep` | ❌ Stopped while on this page |
+| 4 | **Pig** | Walking pig animation 🐷 | `2x oink` `3x sq` | ✅ Active |
+| 5 | **Mesh** | Node: link state, coordinator MAC, channel range, ESP-Now channel, Found count. Core: node count and list, GPS state | `hold:` `core` / `node` | ↔ Forwarded via ESP-Now |
 
 Leaving the Status page clears a double-tap pause. Entering the Mesh page always starts in Node mode.
 
@@ -412,7 +414,7 @@ Equivalent `arduino-cli` FQBN:
 esp32:esp32:XIAO_ESP32C5:UploadSpeed=921600,CDCOnBoot=cdc,CPUFreq=80,FlashFreq=80,FlashMode=qio,FlashSize=8M,PartitionScheme=huge_app,DebugLevel=none,PSRAM=disabled,EraseFlash=none,JTAGAdapter=default,ZigbeeMode=default
 ```
 
-> **PSRAM note:** upstream's flash steps call PSRAM "critical" for HTTPS uploads, but the settings above — with PSRAM disabled — are the ones the stock Piglet C5 firmware is built with, and stock uploads work with them. This fork has been built and run with PSRAM disabled; **uploads have not yet been tested on the fork**, so treat this as provisional.
+> **PSRAM note:** upstream's flash steps call PSRAM "critical" for HTTPS uploads, but the settings above — with PSRAM disabled — are the ones the stock Piglet C5 firmware is built with, and stock uploads work with them. This fork is built and run with PSRAM disabled, and **uploads work on the fork with these settings** (2026-10-21).
 
 ### Flash Steps
 

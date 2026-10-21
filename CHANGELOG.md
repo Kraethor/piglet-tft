@@ -4,6 +4,14 @@
 
 Fork releases are named `v<upstream version>-tft`, and each is based on that upstream release. The upstream changelog continues below, unchanged.
 
+### Unreleased — based on upstream v2.7
+
+Will be released as `v2.7-tft.2`; `FIRMWARE_VERSION` still reads `v2.7-tft` until then.
+
+#### Display and input
+- **Landscape layout.** The panel now runs at 320×240. The stock 128×64 pages are drawn at **2× size (256×128) in the upper-left corner**, through a new scaled flush, and the page code is unchanged. **NEXT** moves to the upper right (60×128) with a two-line hint. The 320×112 strip across the bottom is left free for future status lines.
+- **`rotateScreen180` now turns the whole panel** (button and touch mapping included), not just the page canvas. Touch rotation follows the panel rotation.
+
 ### v2.7-tft (2026-10-21) — based on upstream v2.7
 
 First fork release. **XIAO ESP32-C5 only.**

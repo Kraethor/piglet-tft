@@ -8,7 +8,8 @@ Config cfg;
 // Arduino &SPI object, which is what lets the SD card and the XPT2046 touch
 // controller share this bus via their own CS lines (per WifiScanner_v1). The
 // bus pins are the SD SPI pins; only DC/CS/RST are display-specific. Phase-1
-// draws the pages into a 128x64 framebuffer centered on the 240x320 panel.
+// draws the pages into a 128x64 framebuffer shown at 2x in the upper-left of
+// the landscape panel (rotation is set in setup(), see TftCompat.h).
 Arduino_DataBus *tftBus = new Arduino_HWSPI(
     PINS_C5.tft_dc, PINS_C5.tft_cs,
     PINS_C5.sd_sck, PINS_C5.sd_mosi, PINS_C5.sd_miso,

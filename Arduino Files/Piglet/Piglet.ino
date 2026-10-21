@@ -381,8 +381,10 @@ void setup() {
 
   bool lcdOk = display.begin(SPI_FREQUENCY);  // brings up gfx + allocates the canvas
   if (lcdOk) {
+    // Landscape. Rotate the whole panel, not just the page canvas, so the
+    // touch button and touch mapping turn with it (touchInit() follows gfx).
+    gfx->setRotation(cfg.rotateScreen180 ? 3 : 1);
     gfx->fillScreen(RGB565_BLACK);            // clear the full panel incl. margins
-    display.setRotation(cfg.rotateScreen180 ? 2 : 0);
     touchInit();
     showSplashScreen();
     drawTouchButton();                        // persistent on-screen corner button
