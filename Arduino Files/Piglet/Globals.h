@@ -1,12 +1,13 @@
 #pragma once
-#define FIRMWARE_VERSION "v2.7"
+#define FIRMWARE_VERSION "v2.7-tft"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <WebServer.h>
 #include <SD.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <SPI.h>
+#include "TftCompat.h"           // ILI9341 TFT display (replaces SSD1306 OLED)
+#include <XPT2046_Touchscreen.h> // resistive touch (replaces the physical button)
 #include <TinyGPSPlus.h>
 #include "PinMapDefs.h"
 #include "Config.h"
@@ -18,7 +19,10 @@
 // ---- Global objects ----
 extern PinMap pins;
 extern Config cfg;
-extern Adafruit_SSD1306 display;
+extern Arduino_DataBus *tftBus;   // shared SPI bus (also carries SD + touch)
+extern Arduino_GFX     *gfx;      // ILI9341 panel (full 240x320 surface)
+extern PigletDisplay    display;  // 128x64 framebuffer centered on the panel
+extern XPT2046_Touchscreen touch; // resistive touch controller
 extern TinyGPSPlus gps;
 extern HardwareSerial GPSSerial;
 extern WebServer server;

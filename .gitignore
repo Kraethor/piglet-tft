@@ -4,3 +4,6 @@
 *.ZIP
 AGENTS.md
 tools/
+
+# Arduino build output (was committed upstream; not tracked in this fork)
+Arduino Files/Piglet/build/

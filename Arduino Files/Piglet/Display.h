@@ -1,6 +1,6 @@
 #pragma once
 #include <Arduino.h>
-#include <Adafruit_SSD1306.h>
+#include "TftCompat.h"  // display backend + SSD1306_* color/command compatibility
 
 // OLED layout constants
 static const int OLED_YELLOW_H = 16; // typical 2-color modules

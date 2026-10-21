@@ -1,10 +1,26 @@
 #include "Globals.h"
-#include <Wire.h>
 
 // ---- Global objects ----
-PinMap pins = PINS_C6; // default until detected/configured
+PinMap pins = PINS_C5; // fork targets XIAO ESP32-C5 (re-detected in setup())
 Config cfg;
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// Display: ILI9341 on the shared SPI bus. Arduino_HWSPI rides the standard
+// Arduino &SPI object, which is what lets the SD card and the XPT2046 touch
+// controller share this bus via their own CS lines (per WifiScanner_v1). The
+// bus pins are the SD SPI pins; only DC/CS/RST are display-specific. Phase-1
+// draws the pages into a 128x64 framebuffer centered on the 240x320 panel.
+Arduino_DataBus *tftBus = new Arduino_HWSPI(
+    PINS_C5.tft_dc, PINS_C5.tft_cs,
+    PINS_C5.sd_sck, PINS_C5.sd_mosi, PINS_C5.sd_miso,
+    &SPI, true /* shared interface w/ SD + touch */);
+Arduino_GFX *gfx = new Arduino_ILI9341(
+    tftBus, PINS_C5.tft_rst, 0 /* rotation: portrait */, false /* not IPS */);
+PigletDisplay display(TFT_CANVAS_W, TFT_CANVAS_H, gfx, TFT_CANVAS_X, TFT_CANVAS_Y);
+
+// Touch: TOUCH_IRQ deliberately NOT passed -> every call is a true poll, which
+// avoids XPT2046_Touchscreen's isrWake "dead touch" trap (see FORK.md).
+XPT2046_Touchscreen touch(PINS_C5.tch_cs);
+
 TinyGPSPlus gps;
 HardwareSerial GPSSerial(1);
 WebServer server(80);

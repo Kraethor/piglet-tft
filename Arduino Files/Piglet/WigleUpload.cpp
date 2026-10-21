@@ -625,7 +625,7 @@ bool wardriftTestKey() {
 
   String body =
     String("WigleWifi-1.6,appRelease=") + FIRMWARE_VERSION +
-    ",model=Piglet-Test,release=1,device=Piglet-Test,display=SSD1306-128x64,"
+    ",model=Piglet-Test,release=1,device=Piglet-Test,display=ILI9341-240x320,"
     "board=Piglet-Test,brand=Piglet,star=Sol,body=3,subBody=0\r\n"
     "MAC,SSID,AuthMode,FirstSeen,Channel,Frequency,RSSI,CurrentLatitude,"
     "CurrentLongitude,AltitudeMeters,AccuracyMeters,RCOIs,MfgrId,Type\r\n";

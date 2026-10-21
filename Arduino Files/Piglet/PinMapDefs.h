@@ -2,10 +2,16 @@
 #include <Arduino.h>
 
 struct PinMap {
-  int sda, scl;  // OLED
-  int sd_cs, sd_sck, sd_miso, sd_mosi; // SD
+  int sda, scl;  // OLED I2C (-1 on TFT builds: OLED removed)
+  int sd_cs, sd_sck, sd_miso, sd_mosi; // SD (SPI; the bus is shared with the TFT + touch on TFT builds)
   int gps_rx, gps_tx; // GPS
-  int btn; // Button
+  int btn; // Physical button (-1 = none; TFT build uses an on-screen touch button instead)
+  // --- TFT + touch (fork additions) ---
+  // On TFT builds the ILI9341 and the XPT2046 touch controller share the SD SPI
+  // bus (sd_sck / sd_mosi / sd_miso) and each have their own CS line. Only the
+  // non-bus control lines live here. -1 means "not present on this board".
+  int tft_cs, tft_dc, tft_rst;  // ILI9341 control lines
+  int tch_cs, tch_irq;          // XPT2046 chip-select + interrupt
   const char* name;  // "S3" / "C6" / etc
 };
 
@@ -15,6 +21,8 @@ static const PinMap PINS_S3 = {
   4, 7, 8, 9,
   44, 43,
   2,
+  -1, -1, -1,   // no TFT
+  -1, -1,       // no touch
   "S3"
 };
 
@@ -24,15 +32,24 @@ static const PinMap PINS_C6 = {
   21, 19, 20, 18,
   17, 16,
   1,
+  -1, -1, -1,   // no TFT
+  -1, -1,       // no touch
   "C6"
 };
 
-// --- C5 default pins ---
+// --- C5 default pins (FORK: TFT + touch, OLED + physical button removed) ---
+// Shared SPI bus: SCK=D8/GPIO8, MOSI=D10/GPIO10, MISO=D9/GPIO9.
+// SD CS=D3/GPIO7, TFT CS=D0/GPIO1, Touch CS=D4/GPIO23 — one bus, three CS lines.
+// TFT DC=D1/GPIO0, TFT RESET=D2/GPIO25, Touch IRQ=D5/GPIO24.
+// GPS unchanged: RX=D7/GPIO12 (from GPS TX), TX=D6/GPIO11 (to GPS RX).
+// Matches the WifiScanner_v1 wiring (ai-knowledge: Projects/wifi-scanner-poc.md).
 static const PinMap PINS_C5 = {
-  23, 24,
-  7, 8, 9, 10,
-  12, 11,
-  0,
+  -1, -1,        // OLED removed (D4/D5 now drive the XPT2046 touch CS/IRQ)
+  7, 8, 9, 10,   // SD: cs(D3), sck(D8), miso(D9), mosi(D10) — shared bus
+  12, 11,        // GPS: rx(D7), tx(D6)
+  -1,            // physical button removed — on-screen touch button replaces it
+  1, 0, 25,      // TFT: cs(D0/GPIO1), dc(D1/GPIO0), rst(D2/GPIO25)
+  23, 24,        // Touch: cs(D4/GPIO23), irq(D5/GPIO24)
   "C5"
 };
 
@@ -42,6 +59,8 @@ static const PinMap PINS_S3_EXP_BASE = {
   3, 7, 8, 10,
   12, 11,
   2,
+  -1, -1, -1,   // no TFT
+  -1, -1,       // no touch
   "EXP_BASE"
 };
 
@@ -55,5 +74,7 @@ static const PinMap PINS_XIAO_C3 = {
   2,  8, 9,  10,  // SD:  cs(D0), sck(D8), miso(D9), mosi(D10)
   20, 21,          // GPS: rx(D7/GPIO20 from GPS TX), tx(D6/GPIO21 to GPS RX)
   -1,              // BTN: none (GPIO9=SPI MISO conflict; wire external if needed)
+  -1, -1, -1,      // no TFT
+  -1, -1,          // no touch
   "C3"
 };

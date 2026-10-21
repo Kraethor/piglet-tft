@@ -3,8 +3,8 @@
  *
  * Features:
  * - 2.4GHz WiFi scan -> WiGLE CSV on SD (append GPS per row)
- * - SSD1306 OLED status
- * - User button toggles scanning on/off
+ * - ILI9341 TFT status (fork: replaces the SSD1306 OLED)
+ * - On-screen corner touch button cycles pages (fork: replaces the button)
  * - Boot: start SoftAP (192.168.4.1), attempt STA to home WiFi
  * - If STA connects: upload previous CSV files to WiGLE using Basic token
  * - Web UI: browse/download/delete files, edit config (saved to SD)
@@ -17,7 +17,6 @@
 
 #include <Arduino.h>
 #include <SPI.h>
-#include <Wire.h>
 #include <sys/time.h>
 #include <esp_sleep.h>
 
@@ -30,6 +29,7 @@
 #include "GPS.h"
 #include "SDUtils.h"
 #include "Display.h"
+#include "TouchInput.h"
 #include "WiFiManager.h"
 #include "Scanner.h"
 #include "WigleUpload.h"
@@ -61,16 +61,23 @@ static void enterDeepSleep() {
   display.display();
   delay(600);
 
-  // Configure wake source (button press = LOW on INPUT_PULLUP)
+  // Configure wake source. The physical button is gone in this fork; wake on a
+  // screen touch instead -- the XPT2046 IRQ line (pins.tch_irq) is pulled LOW
+  // while the panel is touched.
+  int wakePin = pins.tch_irq;
+  if (wakePin >= 0) {
   #if defined(CONFIG_IDF_TARGET_ESP32S3)
-    rtc_gpio_pullup_en((gpio_num_t)pins.btn);
-    rtc_gpio_pulldown_dis((gpio_num_t)pins.btn);
-    esp_sleep_enable_ext0_wakeup((gpio_num_t)pins.btn, 0);  // wake on LOW
+    rtc_gpio_pullup_en((gpio_num_t)wakePin);
+    rtc_gpio_pulldown_dis((gpio_num_t)wakePin);
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)wakePin, 0);  // wake on LOW
   #elif defined(CONFIG_IDF_TARGET_ESP32C6) || defined(CONFIG_IDF_TARGET_ESP32C5)
-    esp_deep_sleep_enable_gpio_wakeup(1ULL << pins.btn, ESP_GPIO_WAKEUP_GPIO_LOW);
+    esp_deep_sleep_enable_gpio_wakeup(1ULL << wakePin, ESP_GPIO_WAKEUP_GPIO_LOW);
   #else
-    esp_sleep_enable_ext0_wakeup((gpio_num_t)pins.btn, 0);  // fallback
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)wakePin, 0);  // fallback
   #endif
+  } else {
+    Serial.println("[SLEEP] WARNING: no touch IRQ pin -> no wake source configured");
+  }
 
   // Turn off display
   display.ssd1306_command(SSD1306_DISPLAYOFF);
@@ -117,14 +124,10 @@ static void onPageChange(uint8_t oldPage, uint8_t newPage) {
 
 static const uint32_t DOUBLE_PRESS_MS = 350;  // max gap between presses for double-press
 
-// On XIAO ESP32-C5, the user button shares GPIO0 with the BOOT/flash-mode
-// strapping pin. esptool's DTR/RTS auto-reset sequence (and some serial
-// monitors re-opening the port right after upload) can produce a burst of
-// transient low pulses on GPIO0 in the first moment loop() starts running.
-// Without a guard, pollButton() would interpret each pulse as a real press
-// and could walk currentPage all the way to the mesh node page on its own.
-// Ignore all button input for a short settle window right after boot to
-// absorb that noise; set once near the end of setup().
+// Ignore touch input for a short settle window right after boot. The touch
+// controller can report spurious points while the SPI bus and panel settle,
+// and without a guard pollButton() could read them as real presses and walk
+// currentPage forward on its own. Set once near the end of setup().
 static const uint32_t BTN_BOOT_SETTLE_MS = 1500;
 static uint32_t btnBootSettleUntilMs = 0;
 
@@ -141,7 +144,10 @@ static void pollButton() {
 
   if (millis() < btnBootSettleUntilMs) return;
 
-  int s = digitalRead(pins.btn);
+  // The physical button is gone in this fork; the gesture machine below is fed
+  // by the on-screen corner touch button. Pressed = LOW to match the original
+  // INPUT_PULLUP semantics (idle HIGH, pressed LOW).
+  int s = touchButtonPressed() ? LOW : HIGH;
 
   if (s != lastState) {
     lastDebounce = millis();
@@ -337,40 +343,31 @@ void setup() {
   }
 
   // =========================
-  // Phase 3: Init Button + OLED + GPS using FINAL pins
+  // Phase 3: Init TFT + Touch + GPS using FINAL pins
   // =========================
-  if (pins.btn >= 0) pinMode(pins.btn, INPUT_PULLUP);
-  Serial.print("[BTN] Init");
-  if (pins.btn >= 0) { Serial.print(" OK (GPIO "); Serial.print(pins.btn); Serial.print(", INPUT_PULLUP)"); }
-  else Serial.print(" skipped (btn=-1, no button on this board)");
-  Serial.println();
+  // No physical button in this fork -- navigation uses the on-screen corner
+  // touch button, brought up with the TFT + touch below and polled in
+  // pollButton().
 
-  // I2C OLED (final pins)
-  Serial.println("[LCD] Initializing I2C + SSD1306 (final pins)...");
-  pinMode(pins.sda, INPUT_PULLUP);
-  pinMode(pins.scl, INPUT_PULLUP);
-  delay(50);
+  // TFT (ILI9341 via Arduino_GFX) + XPT2046 touch, both on the shared SPI bus.
+  Serial.println("[LCD] Initializing ILI9341 TFT + XPT2046 touch...");
 
-  Wire.begin(pins.sda, pins.scl);
-  Serial.print("[I2C] SDA="); Serial.print(pins.sda);
-  Serial.print(" SCL="); Serial.println(pins.scl);
-  Serial.print("[I2C] SDA level="); Serial.print(digitalRead(pins.sda));
-  Serial.print(" SCL level="); Serial.println(digitalRead(pins.scl));
-  Wire.setClock(100000);
+  // Deselect every device on the shared bus first, so a floating CS can't
+  // corrupt the display init transfers (per WifiScanner_v1).
+  if (pins.tft_cs >= 0) { pinMode(pins.tft_cs, OUTPUT); digitalWrite(pins.tft_cs, HIGH); }
+  if (pins.tch_cs >= 0) { pinMode(pins.tch_cs, OUTPUT); digitalWrite(pins.tch_cs, HIGH); }
+  if (pins.sd_cs  >= 0) { pinMode(pins.sd_cs,  OUTPUT); digitalWrite(pins.sd_cs,  HIGH); }
 
-  bool lcdOk = false;
-  lcdOk = display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  if (!lcdOk) {
-    Serial.println("[LCD] 0x3C failed, trying 0x3D...");
-    lcdOk = display.begin(SSD1306_SWITCHCAPVCC, 0x3D);
-  }
-
+  bool lcdOk = display.begin(SPI_FREQUENCY);  // brings up gfx + allocates the canvas
   if (lcdOk) {
-    Serial.println("[LCD] SSD1306 init OK");
+    gfx->fillScreen(RGB565_BLACK);            // clear the full panel incl. margins
     display.setRotation(cfg.rotateScreen180 ? 2 : 0);
+    touchInit();
     showSplashScreen();
+    drawTouchButton();                        // persistent on-screen corner button
+    Serial.println("[LCD] TFT init OK");
   } else {
-    Serial.println("[LCD] SSD1306 init FAIL at 0x3C and 0x3D");
+    Serial.println("[LCD] TFT init FAILED (gfx->begin)");
   }
 
   // GPS UART (final pins)
