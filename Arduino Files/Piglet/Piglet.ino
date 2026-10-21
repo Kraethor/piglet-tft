@@ -89,7 +89,13 @@ static void enterDeepSleep() {
 }
 
 // ---------------- Button ----------------
+// Set on a page change so loop() redraws right away instead of waiting out the
+// 500 ms display refresh interval.
+static bool pageRedrawPending = false;
+
 static void onPageChange(uint8_t oldPage, uint8_t newPage) {
+  pageRedrawPending = true;
+
   if (newPage == 3) {
     Serial.println("[PAGE] Entered pause page -> scanning paused");
   } else if (oldPage == 3) {
@@ -120,9 +126,18 @@ static void onPageChange(uint8_t oldPage, uint8_t newPage) {
   Serial.print(oldPage);
   Serial.print(" -> ");
   Serial.println(newPage);
+
+  refreshTouchButton();  // hint line under NEXT is page-specific
 }
 
 static const uint32_t DOUBLE_PRESS_MS = 350;  // max gap between presses for double-press
+
+// Only the status page (double-press = pause) and the pig page (double/triple
+// press) have multi-press gestures. Elsewhere a single press is acted on at
+// release, without waiting out DOUBLE_PRESS_MS.
+static bool pageHasMultiPress(uint8_t page) {
+  return page == 0 || page == 4;
+}
 
 // Ignore touch input for a short settle window right after boot. The touch
 // controller can report spurious points while the SPI bus and panel settle,
@@ -138,9 +153,11 @@ static void pollButton() {
   static uint32_t pressStartMs = 0;
   static bool longPressTriggered = false;
 
-  // Double-press detection
+  // Multi-press detection. The window is measured from the most recent
+  // release, so each tap extends it -- three touch taps can't fit inside a
+  // single 350 ms window measured from the first one.
   static uint8_t  clickCount = 0;
-  static uint32_t firstClickMs = 0;
+  static uint32_t lastClickMs = 0;
 
   if (millis() < btnBootSettleUntilMs) return;
 
@@ -175,6 +192,7 @@ static void pollButton() {
             exitNodeMode();
             enterCoreMode();
           }
+          refreshTouchButton();  // hint flips between "hold: core" / "hold: node"
         } else {
           enterDeepSleep();  // never returns
         }
@@ -183,17 +201,18 @@ static void pollButton() {
       // Released
       if (latched && !longPressTriggered) {
         clickCount++;
-        if (clickCount == 1) {
-          firstClickMs = millis();
-        }
+        lastClickMs = millis();
       }
       latched = false;
       longPressTriggered = false;
     }
   }
 
-  // Evaluate click count after double-press window expires
-  if (clickCount > 0 && (millis() - firstClickMs) > DOUBLE_PRESS_MS) {
+  // Evaluate click count after the multi-press window expires. Not while a
+  // follow-up press is still held, or a slow second tap would be read as a
+  // single press.
+  if (clickCount > 0 && (!pageHasMultiPress(currentPage) ||
+                         (!latched && (millis() - lastClickMs) > DOUBLE_PRESS_MS))) {
     if (clickCount >= 3 && currentPage == 4) {
       sasquatchStart();
     } else if (clickCount == 2 && currentPage == 4) {
@@ -201,6 +220,8 @@ static void pollButton() {
     } else if (clickCount >= 2 && currentPage == 0) {
       // Double press on status page -> toggle scan pause
       statusPagePaused = !statusPagePaused;
+      pageRedrawPending = true;  // show the new play/pause glyph right away
+      refreshTouchButton();      // hint flips between "2x: pause" / "2x: resume"
       Serial.print("[BTN] Double press -> status page scan ");
       Serial.println(statusPagePaused ? "PAUSED" : "RESUMED");
     } else {
@@ -701,7 +722,8 @@ void loop() {
   if (currentPage == 4) {
     // Pig page: animation runs at its own framerate (~90ms)
     pigAnimTick();
-  } else if (millis() - lastOled > 500) {
+  } else if (pageRedrawPending || millis() - lastOled > 500) {
+    pageRedrawPending = false;
     lastOled = millis();
     updateOLED(speedDisplay);  // also dispatches page 5 (mesh node)
   }

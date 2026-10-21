@@ -1,5 +1,6 @@
 #include "TouchInput.h"
 #include "Globals.h"
+#include "MeshNode.h"
 
 // ---- On-screen button geometry (full 240x320 panel coordinates) ----
 // Bottom-right corner, clear of the centered 128x64 page canvas (which occupies
@@ -40,13 +41,39 @@ bool touchButtonPressed() {
           py >= BTN_Y && py <= (BTN_Y + BTN_H));
 }
 
+// Set once the button has been drawn at boot, so refreshTouchButton() never
+// touches the panel when TFT init failed.
+static bool btnDrawn = false;
+
+// Second line under NEXT: the extra gestures available on the current page.
+// Size-1 text is 6 px per char, so keep these to 13 chars inside the border.
+static const char* buttonHint() {
+  switch (currentPage) {
+    case 0:  return statusPagePaused ? "2x: resume" : "2x: pause";
+    case 4:  return "2x oink 3x sq";
+    case 5:  return meshCoreActive ? "hold: node" : "hold: core";
+    default: return "hold: sleep";
+  }
+}
+
+static void drawCenteredInButton(const char* txt, uint8_t size, int16_t y) {
+  int16_t w = (int16_t)strlen(txt) * 6 * size;
+  gfx->setTextSize(size);
+  gfx->setCursor(BTN_X + (BTN_W - w) / 2, y);
+  gfx->print(txt);
+}
+
 void drawTouchButton() {
   // Drawn directly on the panel (not the page canvas) so it persists across
   // page redraws -- the canvas flush only repaints the centered page region.
   gfx->fillRect(BTN_X, BTN_Y, BTN_W, BTN_H, RGB565_BLACK);
   gfx->drawRect(BTN_X, BTN_Y, BTN_W, BTN_H, RGB565_WHITE);
   gfx->setTextColor(RGB565_WHITE, RGB565_BLACK);
-  gfx->setTextSize(2);
-  gfx->setCursor(BTN_X + 13, BTN_Y + 22);
-  gfx->print("NEXT");
+  drawCenteredInButton("NEXT", 2, BTN_Y + 14);
+  drawCenteredInButton(buttonHint(), 1, BTN_Y + 40);
+  btnDrawn = true;
+}
+
+void refreshTouchButton() {
+  if (btnDrawn) drawTouchButton();
 }

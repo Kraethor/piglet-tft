@@ -10,3 +10,4 @@
 void touchInit();            // bring up the XPT2046 (shared SPI bus)
 bool touchButtonPressed();   // true while the on-screen corner button is touched
 void drawTouchButton();      // draw the corner button on the full panel (gfx)
+void refreshTouchButton();   // redraw it (page-specific hint line) if it has been drawn

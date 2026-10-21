@@ -463,7 +463,9 @@ static void drawPageStatus(float speedValue) {
     display.setTextSize(1);
   } else {
     // Match the real scan eligibility logic from loop()
-    bool allowScan = scanningEnabled && sdOk && (userScanOverride || !autoPaused);
+    // (this is the status page, so the double-press pause applies too)
+    bool allowScan = scanningEnabled && sdOk && !statusPagePaused &&
+                     (userScanOverride || !autoPaused);
 
     display.print("Status:");
 
