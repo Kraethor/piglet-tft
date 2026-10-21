@@ -42,7 +42,7 @@ static const PinMap PINS_C6 = {
 // SD CS=D3/GPIO7, TFT CS=D0/GPIO1, Touch CS=D4/GPIO23 — one bus, three CS lines.
 // TFT DC=D1/GPIO0, TFT RESET=D2/GPIO25, Touch IRQ=D5/GPIO24.
 // GPS unchanged: RX=D7/GPIO12 (from GPS TX), TX=D6/GPIO11 (to GPS RX).
-// Matches the WifiScanner_v1 wiring (ai-knowledge: Projects/wifi-scanner-poc.md).
+// Matches the wiring of the author's earlier WifiScanner_v1 TFT build.
 static const PinMap PINS_C5 = {
   -1, -1,        // OLED removed (D4/D5 now drive the XPT2046 touch CS/IRQ)
   7, 8, 9, 10,   // SD: cs(D3), sck(D8), miso(D9), mosi(D10) — shared bus

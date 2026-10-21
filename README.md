@@ -1,38 +1,55 @@
 
-# Piglet Wardriver
+# Piglet-TFT
 
-**Piglet** is an open-source ESP32-based wardriving platform that scans nearby Wi-Fi networks, records GPS position, saves WiGLE-compatible CSV logs to SD, and provides a real-time web UI for control, uploads, and device status.
+**An unofficial fork of [Piglet Wardriver](https://github.com/hamspiced/piglet) by Midwest Gadgets LLC** that replaces Piglet's small I²C OLED and physical button with a **2.8" ILI9341 SPI TFT (240×320) and XPT2046 resistive touch**, on the same **Seeed XIAO ESP32-C5**.
 
-Designed for **[Seeed XIAO ESP32-S3](https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/), [XIAO ESP32-C5](https://wiki.seeedstudio.com/xiao_esp32c5_getting_started/), [XIAO ESP32-C6](https://wiki.seeedstudio.com/xiao_esp32c6_getting_started/), and [XIAO ESP32-C3](https://wiki.seeedstudio.com/XIAO_ESP32C3_Getting_Started/)**, Piglet focuses on:
+Everything else — Wi-Fi scanning, GPS, WiGLE CSV logging to SD, the web UI, uploads, and ESP-Now mesh — is upstream Piglet firmware. This fork changes only the display and input. It is not affiliated with or supported by Midwest Gadgets; please report fork issues here, not upstream.
 
-- Reliable scanning while in motion  
-- Clean WiGLE-ready data collection  
-- Simple field deployment  
-- Fully hackable open firmware
+## What's different from upstream
+
+- **Display:** ILI9341 TFT via [Arduino_GFX](https://github.com/moononournation/Arduino_GFX), sharing the SD card's SPI bus. The stock pages are drawn unchanged into a 128×64 area centred on the screen (phase 1); a full-screen colour layout is planned (phase 2).
+- **Input:** the physical button is replaced by an on-screen **NEXT** button in the bottom-right corner. It drives the same single / double / triple / long-press gestures, and a hint line under NEXT shows what the current page's extra gestures do.
+- **Faster taps:** pages without multi-tap gestures change on release, with no double-tap wait.
+- **Two inherited button bugs fixed:** the status page's play/pause icon now shows a double-tap pause, and triple-tap is reachable (the multi-press window now runs from the latest tap, not the first).
+- **Wake from deep sleep** moves from the button to a screen touch (the XPT2046 IRQ line).
+
+Implementation notes and the phase-1/phase-2 plan are in [`FORK.md`](FORK.md). Changes are on the **`tft`** branch; `main` mirrors upstream.
+
+### Supported hardware
+
+**XIAO ESP32-C5 only.** The main sketch's display code now targets the TFT, so the XIAO S3 / C6 / C3 OLED builds that upstream supports do not work from this fork — use [upstream](https://github.com/hamspiced/piglet) for those.
+
+### Tested so far (2026-10-21)
+
+| Area | Status |
+|---|---|
+| TFT draws all pages | ✅ Tested on hardware |
+| Touch button: tap, double / triple tap, hold on the mesh page | ✅ Tested on hardware |
+| SD logging, GPS fix, WiGLE / WDGoWars / Wardrift uploads | ⏳ Not yet tested on the fork |
+| Touch wake from deep sleep, `rotateScreen180` | ⏳ Not yet tested on the fork |
+| Mesh Node / Core operation with a coordinator | ⏳ Not yet tested (switching modes works) |
 
 
 ## Features
 
-- 2.4 GHz Wi-Fi scanning  
-- 5 GHz scanning on ESP32-C5 hardware  
-- GPS position, heading, and speed logging  
-- SD card logging in WiGLE CSV format  
+- 2.4 GHz and 5 GHz Wi-Fi scanning (ESP32-C5)
+- GPS position, heading, and speed logging
+- SD card logging in WiGLE CSV format
 - Web UI for:
-  - Start / stop scanning  
-  - Upload logs to WiGLE, WDGoWars, and Wardrift  
-  - View device status  
-  - Manage SD files  
-  - Edit configuration  
-- OLED live status display  
-- Optional battery monitoring (board dependent)  
-- Automatic STA connect with AP fallback  
+  - Start / stop scanning
+  - Upload logs to WiGLE, WDGoWars, and Wardrift
+  - View device status
+  - Manage SD files
+  - Edit configuration
+- TFT live status display with an on-screen touch button
+- Optional battery monitoring (board dependent)
+- Automatic STA connect with AP fallback
 - **Home network auto-return** — detects your home SSID while wardriving, automatically connects and uploads pending CSVs, then resumes wardriving once you drive out of range again
 - Optimized for mobile wardriving or warWalking!
 - **ESP-Now Mesh Node mode** — pair with a coordinator device for multi-node wardriving
 - **Mesh auto-start on boot** — configure `meshModeOnBoot` to automatically enter Core or Node mode after uploads complete, bypassing the AP window
-- **Screen rotation** — mount the display upside-down and set `rotateScreen180=true` to flip 180°
+- **Screen rotation** — `rotateScreen180=true` flips the display 180° *(not yet tested on the TFT fork)*
 - **Auto-start wardriving after uploads** — set `autoStartAfterUpload=true` to disconnect from home Wi-Fi immediately after boot uploads complete and begin scanning without delay
-- **PigletNode** — standalone minimal firmware for XIAO ESP32-C5 that boots directly as a mesh node (no display, GPS, or SD required)
 
 
 ## ESP-Now Mesh Network Node Mode
@@ -47,14 +64,14 @@ Piglet includes a built-in **Mesh Node mode** that lets it act as a wireless war
 ### How to Use
 
 1. Power on your coordinator device (Biscuit Pro or JCMK C5 Wardriver)
-2. On Piglet, press the button to cycle pages until you reach **Mesh Node** (the last page after the pig animation)
+2. On Piglet, tap **NEXT** to cycle pages until you reach **Mesh Node** (the last page after the pig animation)
 3. Piglet automatically searches for a coordinator on ESP-Now channel 6
 4. Once connected, it receives a channel range assignment and begins forwarding scan data
-5. Press the button again to exit Mesh Node mode and return to normal wardriving
+5. Tap **NEXT** again to exit Mesh Node mode and return to normal wardriving
 
 ### Mesh Node Display
 
-While in Mesh Node mode the OLED shows:
+While in Mesh Node mode the screen shows:
 - Link status (Searching / Core linked)
 - Coordinator MAC address
 - Assigned channel range
@@ -75,171 +92,63 @@ Set `meshModeOnBoot` in `/wardriver.cfg` to automatically enter mesh mode after 
 
 When `core` or `node` is set the SoftAP window is **skipped entirely** (ESP-Now owns the WiFi stack and the AP would be non-functional). The device goes straight from boot uploads to the mesh page. Set via the web UI **Mesh Mode On Boot** dropdown or directly in `/wardriver.cfg`.
 
+## Hardware
 
-## PigletNode — Standalone Mesh Node
+| Part | Notes |
+|---|---|
+| [Seeed XIAO ESP32-C5](https://www.seeedstudio.com/Seeed-Studio-XIAO-ESP32C5-p-6609.html) | Required |
+| 2.8" ILI9341 SPI TFT, 240×320, with XPT2046 resistive touch | Display and touch share the SD card's SPI bus |
+| ATGM336H GPS module | UART, 9600 baud by default |
+| SPI microSD card module | FAT32 card |
+| Optional LiPo battery | Connected to the XIAO battery inputs |
 
-A minimal, standalone firmware for the **Seeed XIAO ESP32-C5** in the `PigletNode/` folder. No display, GPS, or SD card required — flash it and it automatically pairs with any Piglet running in Core mode and begins scanning.
+### Wiring (XIAO ESP32-C5)
 
-- Single-file Arduino sketch, zero external library dependencies
-- Boots directly into JCMK-compatible ESP-Now node mode
-- Dual-band scanning: 40 channels (2.4 GHz ch 1–14 + 5 GHz UNII-1/2/2e/3)
-- Auto-pairs with Piglet Core mode (XIAO or T-Dongle)
-- 30-second Core timeout with automatic re-search
-- LED: fast blink = searching, slow blink = paired and scanning
-- Hold BOOT button > 2 s to force a re-search
+One SPI bus is shared by the SD card, TFT and touch controller, each with its own chip-select line: **SCK = D8 / GPIO 8, MOSI = D10 / GPIO 10, MISO = D9 / GPIO 9.**
 
-**Flash:** Open `PigletNode/PigletNode.ino` in Arduino IDE, select **XIAO_ESP32C5**, upload. No libraries to install.
+| Signal | XIAO pad | GPIO | Notes |
+|---|---|---|---|
+| SD CS | D3 | 7 | Shared bus |
+| TFT CS | D0 | 1 | Shared bus |
+| TFT DC | D1 | 0 | Was the physical button |
+| TFT RESET | D2 | 25 | |
+| Touch CS | D4 | 23 | Was OLED SDA |
+| Touch IRQ | D5 | 24 | Was OLED SCL — wakes from deep sleep |
+| GPS RX | D7 | 12 | From GPS TX — unchanged from upstream |
+| GPS TX | D6 | 11 | To GPS RX — unchanged from upstream |
 
-
-## T-Dongle C5 Variant
-
-A standalone firmware port is available for the **LilyGo T-Dongle C5** in the `TDongleC5_Piglet/` folder. This variant is a self-contained single-file sketch with its own display driver, LED control, and web UI — no external OLED required.
-
-**Hardware:** LilyGo T-Dongle C5 (ESP32-C5, built-in ST7735 0.96" TFT, APA102 LED, TF card slot)
-
-**Additional GPS:** Connect any UART GPS module via the Qwiic/JST connector (RX=GPIO12, TX=GPIO11)
-
-**Pages:** Status · Networks · Navigation · Pig animation · Mesh Node
-
-### T-Dongle C5 Required Libraries
-
-Install via Arduino Library Manager (`Sketch → Include Library → Manage Libraries`):
-
-| Library | Author |
-|---------|--------|
-| Adafruit ST7735 and ST7789 Library | Adafruit |
-| Adafruit GFX Library | Adafruit |
-| Adafruit BusIO | Adafruit |
-| TinyGPSPlus | Mikal Hart |
-| ArduinoJson | Benoit Blanchon |
-
-All networking, SPI, SD, ESP-Now, and ESP-IDF headers are included in the ESP32 Arduino core — no separate install needed.
-
-**Board setup:** Add `https://espressif.github.io/arduino-esp32/package_esp32_dev_index.json` to Additional Boards Manager URLs, install **esp32 by Espressif v3.x or later**, and select **ESP32C5 Dev Module**.
+The pin map lives in `Arduino Files/Piglet/PinMapDefs.h` and is selected automatically when the firmware detects a C5.
 
 
-## Supported Hardware
+## Touch Button
 
-### Microcontroller Boards
+The **NEXT** button sits in the bottom-right corner of the screen. The small line under it is a reminder of the current page's extra gestures.
 
-- [Seeed XIAO ESP32-S3](https://www.seeedstudio.com/XIAO-ESP32S3-p-5627.html)  
-- [Seeed XIAO ESP32-C5](https://www.seeedstudio.com/Seeed-Studio-XIAO-ESP32C5-p-6609.html) *(required for 5 GHz scanning)*  
-- [Seeed XIAO ESP32-C6](https://www.seeedstudio.com/Seeed-Studio-XIAO-ESP32C6-p-5884.html)  
-- [Seeed XIAO ESP32-C3](https://www.seeedstudio.com/Seeed-XIAO-ESP32C3-p-5431.html) *(2.4 GHz only, headless — set `board=c3`)*  
-- LilyGo T-Dongle C5 *(standalone variant — see above)*
-- [Seeed XIAO ESP32-C5](https://www.seeedstudio.com/Seeed-Studio-XIAO-ESP32C5-p-6609.html)  *(PigletNode — mesh node only, see above)*  
+### Gestures
 
-### Required Peripherals
+| Gesture | Action |
+|---|---|
+| **Tap** | Next page |
+| **Double tap** *(Status page)* | Pause / resume scanning |
+| **Double tap** *(Pig page)* | Pig twerk ("OINK!") |
+| **Triple tap** *(Pig page)* | Sasquatch walks across |
+| **Hold 2 s** *(Mesh page)* | Switch between Mesh Node and Mesh Core |
+| **Hold 2 s** *(any other page)* | Deep sleep — the log file is closed first; touch the screen to wake (full reboot) |
 
-- I2C GPS module (ATGM336H)
-- 128×64 SSD1306 OLED display (I2C)
-- SPI SD card module
-- Optional LiPo battery connected to XIAO battery inputs
+Multi-tap taps must each follow the previous one within 350 ms. Only the Status and Pig pages wait for a possible second tap; on every other page a tap acts as soon as you lift your finger.
 
-### Peripheral Sourcing  
-You can get everything on Amazon but its pricey.  if you dont mind waiting on aliexpress heres the build list.
-- Xiao-C5 - 7$ [SeedStudio](https://www.seeedstudio.com/Seeed-Studio-XIAO-ESP32C5-p-6609.html)
-- SSD1306 128x63 OLED - $2 [aliexpress](https://www.aliexpress.us/item/3256805954920554.html)
-- ATGM-336h - $3.39 [aliexpress](https://www.aliexpress.us/item/3256809330278648.html)
-- SD-Card Module - $1.33 [aliexpress](https://www.aliexpress.us/item/3256808167816573.html)
-- User Button - $0.41 [Item:CS1211 From Digikey](https://www.digikey.com/en/products/detail/cit-relay-and-switch/CS1211/16607858)
+### Pages
 
-$14 if you wanted to breadboard it yourself.
+| Page | Name | What it shows | Hint under NEXT | Scanning |
+|---|---|---|---|---|
+| 0 | **Status** | Play/pause icon, GPS indicator, STA and SD state, 2.4 / 5 GHz counts, battery, speed, IP or AP countdown, upload progress | `2x: pause` / `2x: resume` | ✅ Active unless paused |
+| 1 | **Networks** | 2.4 GHz, 5 GHz and total network counts | `hold: sleep` | ✅ Active |
+| 2 | **Navigation** | Compass arrow, heading, speed; `No Fix` and satellite dots without a fix | `hold: sleep` | ✅ Active |
+| 3 | **Paused** | `Scan paused` | `hold: sleep` | ❌ Stopped while on this page |
+| 4 | **Pig** | Walking pig animation 🐷 | `2x oink 3x sq` | ✅ Active |
+| 5 | **Mesh** | Node: link state, coordinator MAC, channel range, ESP-Now channel, Found count. Core: node count and list, GPS state | `hold: core` / `hold: node` | ↔ Forwarded via ESP-Now |
 
-
-## Wiring / Pinouts
-
-Pin mappings are automatically selected by firmware.
-
-### XIAO ESP32-S3
-
-| Function | Pin |
-|----------|-----|
-| I2C SDA | GPIO 5 |
-| I2C SCL | GPIO 6 |
-| GPS RX | GPIO 4 |
-| GPS TX | GPIO 7 |
-| Button | GPIO 1 |
-| SD CS | GPIO 2 |
-| SD MOSI | GPIO 10 |
-| SD MISO | GPIO 9 |
-| SD SCK | GPIO 8 |
-
-### XIAO ESP32-C6 / ESP32-C5
-
-| Function | Pin |
-|----------|----- |
-| I2C SDA | GPIO 23 |
-| I2C SCL | GPIO 24 |
-| GPS RX | GPIO 12 |
-| GPS TX | GPIO 11 |
-| Button | GPIO 0 |
-| SD CS | GPIO 7 |
-| SD MOSI | GPIO 10 |
-| SD MISO | GPIO 9 |
-| SD SCK | GPIO 8 |
-
-**Note:** Only the ESP32-C5 supports 5 GHz Wi-Fi scanning.
-
-### XIAO ESP32-C3
-
-Set `board=c3` in `/wardriver.cfg` or select **XIAO C3** in the Web UI. Auto-detected from chip model on first boot.
-
-| Function | Pin |
-|----------|----- |
-| I2C SDA | GPIO 6 (D4) |
-| I2C SCL | GPIO 7 (D5) |
-| GPS RX | GPIO 20 (D7) |
-| GPS TX | GPIO 21 (D6) |
-| Button | *none* (GPIO 9 = SPI MISO conflict — wire externally if needed) |
-| SD CS | GPIO 2 (D0) |
-| SD MOSI | GPIO 10 (D10) |
-| SD MISO | GPIO 9 (D9) |
-| SD SCK | GPIO 8 (D8) |
-
-**Note:** 2.4 GHz only. No built-in display — attach an optional SSD1306 OLED on D4/D5.
-
-
-## 3D Printed Cases
-
-Print-ready STL files are available in the `Case Files/` directory. These cases are designed specifically for the Piglet PCB and module stack.
-
-### 👏 Case Design by Bread — Breadbox Systems
-
-The Piglet case was designed by **Bread** at [Breadbox Systems](https://breadboxsystems.com). If you print one, please take a moment to **like and boost the design on MakerWorld** — it helps the creator and makes the design easier for others to find.
-
-> **[🖨️ Print the Piglet Wardriver Case on MakerWorld →](https://makerworld.com/en/models/2708429-piglet-wardriver-case#profileId-3000037)**
-
-| File | Description |
-|------|-------------|
-| `Piglet Face.STL` | Front panel / lid |
-| `Piglet Butt.STL` | Rear enclosure |
-| `Piglet Butt with SMA hole.STL` | Rear enclosure with external antenna cutout |
-| `Piglet Midboard.STL` | Internal standoff / mid-layer |
-| `Piglet Features.stl` | Feature plate / accessory mount |
-
-For the **T-Dongle C5** variant, GPS antenna mount STLs are included in `TDongleC5_Piglet/GPS STL/`.
-
-> Print with standard PLA or PETG. No supports required on most parts. Recommend 0.2 mm layer height, 3 perimeters.
-
-
-## PCB Design
-
-Piglet includes custom PCB designs for compact, production-ready builds. KiCad project files and Gerber production files are available in the `PCB Files/` directory.
-
-### PCB Images
-
-| Board Front | Board Back | Board Close-up |
-|-------------|------------|----------------|
-| ![Board1](Images/Board1.jpg) | ![Board2](Images/Board2.jpg) | ![Board3](Images/Board3.jpg) |
-
-### Assembled Piglet
-
-| Module Arrangement | Front View | Back View |
-|--------------------|------------|----------|
-| ![Module Arrangement](Images/Module_Arrangement.png) | ![Built Piglet Front](Images/BuiltPiglet.jpg) | ![Built Piglet Back](Images/BackBuiltPiglet.jpg) |
-
-**Assembly Note:** When stacking modules, apply **Kapton tape** between components to prevent electrical shorts. Pay special attention to exposed pins and solder joints that may contact adjacent modules.
+Leaving the Status page clears a double-tap pause. Entering the Mesh page always starts in Node mode.
 
 
 ## First Time Run Initialization
@@ -254,7 +163,7 @@ The SoftAP runs for **60 seconds** by default. About **30 seconds before** that 
 - **Start Scanning Now** — closes the AP immediately and begins wardriving.
 - **Ignored / browser closed** — timer runs out, AP closes, scanning starts.
 
-The OLED shows the live countdown (`AP: 192.168.4.1 60s` initially, `m:ss` once extended). Once your home Wi-Fi is configured, the device will connect to it on subsequent boots and the WebUI is reachable on the STA IP shown on the OLED — the AP only comes up if STA fails.
+The Status page shows the live countdown (`AP: 192.168.4.1 60s` initially, `m:ss` once extended). Once your home Wi-Fi is configured, the device will connect to it on subsequent boots and the WebUI is reachable on the STA IP shown on the Status page — the AP only comes up if STA fails.
 
 **Location:** `/wardriver.cfg` on the SD card root
 
@@ -463,116 +372,78 @@ When Piglet is away from the saved home network (or the home network is unavaila
 4. Save the file, re-insert the SD card, and reboot
 
 
-## Button Functions
-
-### Press Types
-
-| Press | Timing | Action |
-|-------|--------|--------|
-| **Single press** | Quick tap | Advance to next page |
-| **Double press** | Two taps within 350 ms | Toggle scan pause *(Status page only)* |
-| **Long press** | Hold ≥ 2 seconds | Enter deep sleep |
-| **Single press** *(while sleeping)* | Any | Wake from deep sleep / reboot |
-
-### Pages (Single Press cycles through these)
-
-| Page | Name | What it Shows | Scanning |
-|------|------|---------------|----------|
-| 0 | **Status** | Scan state, SD, GPS fix, WiFi, network counts, speed, IP, upload status | ✅ Active |
-| 1 | **Networks** | Large display of 2.4 GHz, 5 GHz, and total network counts | ✅ Active |
-| 2 | **Navigation** | Compass arrow, heading direction, current speed | ✅ Active |
-| 3 | **Paused** | Pause icon — scanning fully stopped | ❌ Paused |
-| 4 | **Pig** | Walking pig animation 🐷 | ✅ Active |
-| 5 | **Mesh Node** | ESP-Now link state, coordinator MAC, channel range, Found/Sent counts | ↔ Forwarded via ESP-Now |
-
-### Double Press — Status Page Only
-
-When on the **Status page**, double-pressing toggles a scan pause without leaving the page. Useful for a quick stop without navigating to the Pause page.
-
-- **Double press →** Scanning paused on status page
-- **Double press again →** Scanning resumed
-- **Single press (page change) →** Pause automatically cleared when leaving page 0
-
-### Long Press — Deep Sleep
-
-Hold the button for **2 seconds** from any page:
-- Active log file is flushed and closed before sleeping
-- OLED displays `Sleep...` then powers off
-- A single button press wakes the device (full reboot)
-
-### Mesh Node Page
-
-Entering **page 5** automatically starts ESP-Now node mode. Leaving it (single press to advance) automatically restores normal wardriving. See the [ESP-Now Mesh Network Node Mode](#esp-now-mesh-network-node-mode) section above for details.
-
 ## Building Firmware
 
 ### Requirements
 
-- **Arduino IDE 2.x** or **PlatformIO**
-- **Arduino-ESP32 core** v3.0.0 or later
+- **Arduino IDE 2.x** (or `arduino-cli`)
+- **Arduino-ESP32 core** by Espressif — built and tested with **3.3.10**
+- Sketch folder: **`Arduino Files/Piglet/`** (open `Piglet.ino`)
 
-### Required Libraries — XIAO Variant (S3 / C5 / C6)
+### Required Libraries
 
 Install via Arduino Library Manager (`Sketch → Include Library → Manage Libraries`):
 
 | Library | Author | Notes |
 |---------|--------|-------|
-| TinyGPSPlus | Mikal Hart | GPS NMEA parsing |
-| Adafruit GFX Library | Adafruit | Graphics dependency |
-| Adafruit SSD1306 | Adafruit | OLED display driver |
-| Adafruit BusIO | Adafruit | Required by SSD1306 |
-| ArduinoJson | Benoit Blanchon | v6.x or v7.x |
-
-All other headers (`WiFi`, `WebServer`, `WiFiClientSecure`, `HTTPClient`, `SD`, `SPI`, `Wire`, `esp_now.h`, `esp_wifi.h`) are included in the ESP32 Arduino core — no separate install needed.
-
-### Required Libraries — T-Dongle C5 Variant
-
-Install via Arduino Library Manager:
-
-| Library | Author | Notes |
-|---------|--------|-------|
-| Adafruit ST7735 and ST7789 Library | Adafruit | TFT display driver |
-| Adafruit GFX Library | Adafruit | Graphics dependency |
-| Adafruit BusIO | Adafruit | Required by ST7735 |
+| GFX Library for Arduino (`Arduino_GFX_Library`) | moononournation | ILI9341 TFT driver — replaces Adafruit SSD1306 |
+| XPT2046_Touchscreen | Paul Stoffregen | Touch controller |
 | TinyGPSPlus | Mikal Hart | GPS NMEA parsing |
 | ArduinoJson | Benoit Blanchon | v6.x or v7.x |
 
-All networking, SPI, SD, ESP-Now, and ESP-IDF headers are built into the ESP32 core.
+The Adafruit SSD1306, GFX and BusIO libraries that upstream needs are **not** used by this fork. All other headers (`WiFi`, `WebServer`, `WiFiClientSecure`, `HTTPClient`, `SD`, `SPI`, `esp_now.h`, `esp_wifi.h`) come with the ESP32 Arduino core.
+
+### Board Settings
+
+Select **XIAO_ESP32C5**, then under **Tools**:
+
+| Setting | Value |
+|---|---|
+| USB CDC On Boot | **Enabled** — otherwise serial output goes to the UART pins, not USB |
+| Partition Scheme | **Huge APP (3MB No OTA/1MB SPIFFS)** |
+| Flash Size | 8MB |
+| Flash Mode / Flash Frequency | QIO / 80MHz |
+| CPU Frequency | 80MHz |
+| PSRAM | Disabled — see the note below |
+
+Equivalent `arduino-cli` FQBN:
+
+```
+esp32:esp32:XIAO_ESP32C5:UploadSpeed=921600,CDCOnBoot=cdc,CPUFreq=80,FlashFreq=80,FlashMode=qio,FlashSize=8M,PartitionScheme=huge_app,DebugLevel=none,PSRAM=disabled,EraseFlash=none,JTAGAdapter=default,ZigbeeMode=default
+```
+
+> **PSRAM note:** upstream's flash steps call PSRAM "critical" for HTTPS uploads, but the settings above — with PSRAM disabled — are the ones the stock Piglet C5 firmware is built with, and stock uploads work with them. This fork has been built and run with PSRAM disabled; **uploads have not yet been tested on the fork**, so treat this as provisional.
 
 ### Flash Steps
 
-1. Select the correct **XIAO ESP32 board** variant (S3, C5, or C6)
-2. **CRITICAL:** Enable **PSRAM** (required for TLS/HTTPS uploads)
-   - Tools → PSRAM → **OPI PSRAM** (C5/C6) or **QSPI PSRAM** (S3)
-3. Use a **large app partition scheme** → **Huge APP (3MB No OTA/1MB SPIFFS)**
-4. Upload firmware  
-5. Insert **FAT32-formatted SD card**  
-6. Add `/wardriver.cfg` to SD card root with your WiGLE API key and WiFi credentials
-7. Restart device with RST button or power cycle
+1. Build and upload as usual.
+2. **If the upload fails** (`Failed to start stub flasher`, or `No serial data received`): unplug the board, **hold BOOT while plugging it back in**, and upload again. If the stub flasher still fails, flash with `esptool` directly using `--no-stub`. **Leave the flash options as `keep`** — passing explicit `--flash-mode` / `--flash-freq` / `--flash-size` rewrites the bootloader header, and the board then boot-loops.
+3. After flashing from download mode the board **stays in the bootloader** (white screen) — tap **RESET** or replug it.
+4. Insert a **FAT32-formatted SD card**, add `/wardriver.cfg` (see above), and restart.
 
-### Where to Order
 
-I always order everything from JLCPCB because i get the best deals.  However i do understand that people prefer the all in one project offers of PCBway so i have created this project here:
+## Upstream-only Folders
 
-[PCBWayProjects](https://www.pcbway.com/project/shareproject/Piglet_Opensource_Wardriving_Project_1a21b94b.html)
+These folders are kept **unchanged from upstream** so that upstream releases merge cleanly. They do not include the TFT changes — see [upstream](https://github.com/hamspiced/piglet) for their documentation:
 
+- `TDongleC5_Piglet/` — LilyGo T-Dongle C5 standalone firmware
+- `PigletNode/` — standalone XIAO ESP32-C5 mesh node (has its own [README](PigletNode/README.md))
+- `waveshareDisplayMiniPiglet/` — Waveshare display variant
+- `PCB Files/`, `Case Files/` — PCB and 3D-printed case **for the stock OLED build**; they are not designed for the 2.8" TFT. The Piglet case is by **Bread** at [Breadbox Systems](https://breadboxsystems.com) — [MakerWorld](https://makerworld.com/en/models/2708429-piglet-wardriver-case#profileId-3000037).
 
 
 ## License
 
-Creative Commons Attribution-NonCommercial 4.0 (CC BY-NC 4.0)
+**Creative Commons Attribution-NonCommercial-ShareAlike 4.0 (CC BY-NC-SA 4.0)** — see [`LICENSE`](LICENSE). This fork is distributed under the same license, as ShareAlike requires.
 
-You may:
+You may use, modify and share this project for **non-commercial** purposes, with attribution, and any adaptation you share must carry the same license.
 
-- Use  
-- Modify  
-- Share  
+https://creativecommons.org/licenses/by-nc-sa/4.0/
 
-You may **not** use this project for commercial purposes.
-
-https://creativecommons.org/licenses/by-nc/4.0/
+*(Upstream's README states CC BY-NC 4.0, but the upstream `LICENSE` file and `CREDITS.md` both say CC BY-NC-SA 4.0; this fork follows the `LICENSE` file.)*
 
 ---
 
-Created by **Midwewest Gadgets LLC**
+**Piglet** was created by **Midwest Gadgets LLC** — [hamspiced/piglet](https://github.com/hamspiced/piglet). See [`CREDITS.md`](CREDITS.md) for third-party acknowledgements.
 
+**Piglet-TFT** is a modified version, maintained by [Kraethor](https://github.com/Kraethor). Changes from upstream: replaced the OLED and button with an ILI9341 TFT and XPT2046 touch, and changed the button handling as described in "What's different from upstream" above. The full history is on the `tft` branch.

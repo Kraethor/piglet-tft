@@ -32,10 +32,9 @@ Shared SPI bus: SCK=D8/GPIO8, MOSI=D10/GPIO10, MISO=D9/GPIO9.
 | GPS RX      | D7       | 12    | unchanged |
 | GPS TX      | D6       | 11    | unchanged |
 
-Reference wiring: ai-knowledge vault, `Projects/wifi-scanner-poc.md`
-(authoritative 2026-07-24 rewire table).
+This is the same wiring as the author's earlier `WifiScanner_v1` TFT build.
 
-## Status — phase-1 implemented (not yet compiled)
+## Status — phase-1 implemented, built and running (2026-10-21)
 
 - [x] Repo cloned; `build/` artifacts untracked.
 - [x] Pin map: C5 set to TFT+touch; OLED (`sda`/`scl`) and `btn` set to -1.
@@ -49,8 +48,9 @@ Reference wiring: ai-knowledge vault, `Projects/wifi-scanner-poc.md`
       button gesture state machine (`pollButton()`), so single / double / triple /
       long-press all still work from that one corner.
 - [x] Deep-sleep wake moved from the button pin to the touch IRQ (`pins.tch_irq`).
-- [ ] Compile/flash verification — **not possible on Bifrost (no Arduino
-      toolchain)**; build in the Arduino IDE / KVM "Windows-Programming" VM.
+- [x] Compile/flash verification — built and flashed onto a XIAO ESP32-C5
+      2026-10-21; TFT pages and all touch-button gestures tested on the device.
+      SD logging, GPS fix, uploads and touch wake from deep sleep not yet tested.
 
 ### Required libraries (add to the build)
 
@@ -74,12 +74,10 @@ Reference wiring: ai-knowledge vault, `Projects/wifi-scanner-poc.md`
 ## Reference & proven approach (shared SPI — solved)
 
 The trickiest part is three SPI devices (TFT, SD, touch) sharing one bus with
-separate CS lines on the C5. `WifiScanner_v1` already solved it; its source is on
-this machine at:
+separate CS lines on the C5. The author's earlier `WifiScanner_v1` TFT build
+already solved it.
 
-`C:\Users\tron\OneDrive - Nortron\Documents\Arduino\sketches\WifiScanner_v1\WifiScanner_v1.ino`
-
-Proven stack to port from (verbatim from that sketch):
+Proven stack ported from it:
 
 ```cpp
 #include <Arduino_GFX_Library.h>
@@ -103,5 +101,4 @@ pixel via a 2-point calibration persisted to the SD card.
 
 ## Build note
 
-No Arduino toolchain on Bifrost — nothing here is compile-checked. Build/flash in
-the Arduino IDE or the KVM "Windows-Programming" VM (ESP32-C5 core, PSRAM on).
+See **Building Firmware** in `README.md` for board settings and flashing.
