@@ -30,6 +30,7 @@
 #include "SDUtils.h"
 #include "Display.h"
 #include "TouchInput.h"
+#include "StatusStrip.h"
 #include "WiFiManager.h"
 #include "Scanner.h"
 #include "WigleUpload.h"
@@ -128,6 +129,7 @@ static void onPageChange(uint8_t oldPage, uint8_t newPage) {
   Serial.println(newPage);
 
   refreshTouchButton();  // hint line under NEXT is page-specific
+  if (oldPage == 2) statusStripClear();  // GPS status shows on the Navigation page only
 }
 
 static const uint32_t DOUBLE_PRESS_MS = 350;  // max gap between presses for double-press
@@ -388,6 +390,7 @@ void setup() {
     touchInit();
     showSplashScreen();
     drawTouchButton();                        // persistent on-screen corner button
+    statusStripInit();                        // separator above the bottom status strip
     Serial.println("[LCD] TFT init OK");
   } else {
     Serial.println("[LCD] TFT init FAILED (gfx->begin)");
@@ -728,6 +731,7 @@ void loop() {
     pageRedrawPending = false;
     lastOled = millis();
     updateOLED(speedDisplay);  // also dispatches page 5 (mesh node)
+    if (currentPage == 2) statusStripDrawGps();
   }
 
   // Skip STA transition handler in mesh mode — it calls WiFi.disconnect(wifioff=true)

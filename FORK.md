@@ -38,23 +38,30 @@ The stock pages (`Display.cpp`, `MeshNode.cpp`, splash and sleep screens) are
 written against the Adafruit_SSD1306 API on a 128×64 monochrome buffer. Phase 1
 leaves that code alone and runs it on the TFT through a small shim:
 
-- **`TftCompat.h`** defines `PigletDisplay`, an `Arduino_Canvas` of 128×64 that
+- **`TftCompat.h`** defines `PigletDisplay`, an `Arduino_Canvas` of 160×64 that
   adds the three SSD1306-only calls the pages use: `clearDisplay()` →
   `fillScreen(black)`, `display()` → a 2× scaled flush, and `ssd1306_command()` → no-op.
   `SSD1306_WHITE` / `SSD1306_BLACK` map to RGB565 white / black.
 - The panel runs in **landscape, 320×240** (`gfx->setRotation(1)`, or 3 with
   `rotateScreen180`). `display()` calls `flushScaled()` rather than
   `Arduino_Canvas::flush()`: each canvas pixel is written as a 2×2 block, one
-  scaled row band per transfer, so the page fills **256×128 in the upper-left
-  corner** (`TFT_CANVAS_SCALE`, `TFT_PAGE_W/H`). The NEXT button sits to its
-  right, and the 320×112 strip below both is free for future status lines.
+  scaled row band per transfer, so the page fills **the top 320×128** of the
+  panel (`TFT_CANVAS_SCALE`, `TFT_PAGE_W/H`).
+- **The canvas is 160 wide, not the OLED's 128,** so it fills the panel width at
+  2×. The stock pages still lay out for `OLED_W` (128), so they sit at the left
+  with 32 logical px spare on the right. That spare room is what stops long
+  size-2 text from wrapping: the Status page's `"Wardrift UL"` upload header is
+  132 px, wider than 128, and wraps its last letter on stock Piglet too.
+- Below the page: a 3 px white separator (`TFT_SEP_Y`), then the **status strip**
+  (`TFT_STRIP_Y` to the bottom), with the NEXT button at its right end
+  (`TFT_BTN_X`). All of this layout lives in `TftCompat.h`.
 - Each redraw sends four times the pixels of a 1:1 flush; on hardware the pig
   animation and page changes still look smooth (2026-10-21).
 - Everything else (`drawRect`, `print`, `setTextSize`, `getTextBounds`, …) is
   inherited from Arduino_GFX, so the page code compiles unchanged.
 
-**RAM:** the 128×64×16 bpp canvas is about 16 KB, plus a 1 KB row band for the
-scaled flush, which fits comfortably without PSRAM. The fork is built and run with PSRAM disabled.
+**RAM:** the 160×64×16 bpp canvas is about 20 KB, plus a 1.3 KB row band for
+the scaled flush, which fits comfortably without PSRAM. The fork is built and run with PSRAM disabled.
 
 ## Shared SPI bus
 
@@ -89,9 +96,9 @@ Arduino_GFX colours are RGB565 (`RGB565_BLACK`, `RGB565_WHITE`, …).
 ## Touch input
 
 - **`TouchInput.cpp`** polls the XPT2046 and reports whether the **NEXT** button
-  zone (upper-right, 60×128 px at x = 260, y = 0) is being touched, with a
+  zone (bottom-right, 64×105 px at x = 256, y = 135) is being touched, with a
   minimum pressure of z ≥ 300. The zone isn't bounded at the panel's right and
-  top edges, because uncalibrated readings can map slightly past them.
+  bottom edges, because uncalibrated readings can map slightly past them.
 - **Touch rotation follows the panel:** `touch.setRotation(gfx->getRotation())`.
   XPT2046_Touchscreen's rotations line up with Arduino_GFX's — portrait 0 and
   landscape 1 are both verified on hardware.
@@ -107,6 +114,26 @@ Arduino_GFX colours are RGB565 (`RGB565_BLACK`, `RGB565_WHITE`, …).
   the canvas, so canvas flushes never overwrite them. `refreshTouchButton()`
   redraws the button when its hint changes: on a page change, a status-page
   pause toggle, and a mesh Core/Node switch.
+
+## Status strip (`StatusStrip.cpp`)
+
+Drawn directly on the panel, outside the page canvas, so canvas flushes never
+touch it. `statusStripInit()` draws the separator at boot; `loop()` calls
+`statusStripDrawGps()` after each 500 ms page refresh while on the Navigation
+page (2), and `onPageChange()` clears the strip when leaving it.
+
+The GPS state comes from TinyGPSPlus's own counters — the same ones as the
+serial `[GPS] chars=… ok=… fail=…` diagnostic:
+
+- **No data:** no new bytes (`charsProcessed()`) for 3 s, or none since boot.
+- **Garbled:** more checksum failures than passes *since the previous redraw*,
+  so an old burst of errors doesn't stick.
+- **Searching / fix:** `gpsHasFix`, with `satellites` and `hdop`.
+- Fix history uses `lastGpsValid` / `lastGpsValidMs` from the position cache.
+
+Rows are size-2 text, 20 characters each, drawn with a background colour and
+padded to full width, so they overwrite in place without clearing or flicker.
+Size-1 grey text was tried first and was unreadable outdoors.
 
 ### Changes from upstream's gesture handling
 
@@ -136,9 +163,10 @@ panel is touched. *Not yet tested on hardware.*
 - [x] Built and flashed on a XIAO ESP32-C5 (core 3.3.10); TFT pages and all
       touch gestures tested on the device (2026-10-21).
 - [x] Uploads work on the fork, with PSRAM disabled (2026-10-21; service not recorded).
-- [x] Landscape layout with 2× pages and the button upper right; touch works in
-      landscape (2026-10-21).
-- [ ] SD logging and GPS fix — not yet confirmed; no GPS fix seen yet on the fork.
+- [x] Landscape layout, full-width 2× pages, divider, NEXT bottom-right; touch
+      works in landscape (2026-10-21).
+- [x] GPS fix, and the GPS status strip on the Navigation page (2026-10-21).
+- [ ] SD logging — not yet confirmed on the fork.
 - [ ] Touch wake from deep sleep — not yet tested.
 - [ ] `rotateScreen180` — not yet tested. It now turns the whole panel (rotation
       3), and the touch mapping follows.

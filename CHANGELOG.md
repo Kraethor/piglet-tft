@@ -9,7 +9,9 @@ Fork releases are named `v<upstream version>-tft`, and each is based on that ups
 Will be released as `v2.7-tft.2`; `FIRMWARE_VERSION` still reads `v2.7-tft` until then.
 
 #### Display and input
-- **Landscape layout.** The panel now runs at 320×240. The stock 128×64 pages are drawn at **2× size (256×128) in the upper-left corner**, through a new scaled flush, and the page code is unchanged. **NEXT** moves to the upper right (60×128) with a two-line hint. The 320×112 strip across the bottom is left free for future status lines.
+- **Landscape layout.** The panel now runs at 320×240. The pages are drawn at **2× size across the top (320×128)** through a new scaled flush, and the page code is unchanged. A 3 px white divider separates them from a **status strip** along the bottom, with **NEXT** at its right end (64×105) and a two-line hint.
+- **GPS status strip.** On the Navigation page the strip shows the GPS state — `NO DATA`, `GARBLED`, `SEARCHING` or `FIX` — with satellites / HDOP, checksum and byte counters, time since the last byte, and the position or time since the last fix. "No Fix" no longer leaves you guessing whether the GPS is dead or still acquiring.
+- **Upload header no longer wraps.** The page canvas is now 160 wide (filling the panel at 2×), so the 132 px `"Wardrift UL"` header fits instead of wrapping its last letter. (On stock Piglet's 128 px OLED it wraps too.)
 - **`rotateScreen180` now turns the whole panel** (button and touch mapping included), not just the page canvas. Touch rotation follows the panel rotation.
 
 ### v2.7-tft (2026-10-21) — based on upstream v2.7
@@ -36,7 +38,7 @@ First fork release. **XIAO ESP32-C5 only.**
 - Adds **GFX Library for Arduino** (`Arduino_GFX_Library`) and **XPT2046_Touchscreen**. **Adafruit SSD1306, Adafruit GFX and Adafruit BusIO** are no longer used.
 
 #### Not yet tested on the fork
-- SD logging, GPS fix, uploads, touch wake from deep sleep, `rotateScreen180`.
+- SD logging, GPS fix, uploads, touch wake from deep sleep, `rotateScreen180`. *(Uploads and GPS fix were confirmed later, under Unreleased.)*
 
 ---
 

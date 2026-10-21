@@ -7,8 +7,8 @@ Everything else — Wi-Fi scanning, GPS, WiGLE CSV logging to SD, the web UI, up
 
 ## What's different from upstream
 
-- **Display:** ILI9341 TFT via [Arduino_GFX](https://github.com/moononournation/Arduino_GFX), sharing the SD card's SPI bus. The panel runs in landscape (320×240). The stock 128×64 pages are drawn unchanged at 2× size (256×128) in the upper-left corner (phase 1), leaving a strip across the bottom for future status lines; a full-screen colour layout is planned (phase 2).
-- **Input:** the physical button is replaced by an on-screen **NEXT** button in the upper-right corner, beside the page. It drives the same single / double / triple / long-press gestures, and a two-line hint under NEXT shows what the current page's extra gestures do.
+- **Display:** ILI9341 TFT via [Arduino_GFX](https://github.com/moononournation/Arduino_GFX), sharing the SD card's SPI bus. The panel runs in landscape (320×240). The stock pages are drawn unchanged at 2× size across the top (320×128, phase 1). Below a divider, a status strip across the bottom shows the GPS state on the Navigation page; a full-screen colour layout is planned (phase 2).
+- **Input:** the physical button is replaced by an on-screen **NEXT** button at the right end of the bottom strip. It drives the same single / double / triple / long-press gestures, and a two-line hint under NEXT shows what the current page's extra gestures do.
 - **Faster taps:** pages without multi-tap gestures change on release, with no double-tap wait.
 - **Two inherited button bugs fixed:** the status page's play/pause icon now shows a double-tap pause, and triple-tap is reachable (the multi-press window now runs from the latest tap, not the first).
 - **Wake from deep sleep** moves from the button to a screen touch (the XPT2046 IRQ line).
@@ -26,8 +26,9 @@ Implementation notes and the phase-1/phase-2 plan are in [`FORK.md`](FORK.md). C
 | TFT draws all pages | ✅ Tested on hardware |
 | Touch button: tap, double / triple tap, hold on the mesh page | ✅ Tested on hardware |
 | Uploads | ✅ Working on hardware (service not recorded) |
-| SD logging, GPS fix | ⏳ Not yet confirmed — no GPS fix seen yet on the fork |
-| Landscape layout, 2× pages, touch in landscape | ✅ Tested on hardware |
+| GPS fix, GPS status strip | ✅ Tested on hardware |
+| SD logging | ⏳ Not yet confirmed on the fork |
+| Landscape layout, full-width 2× pages, touch in landscape | ✅ Tested on hardware |
 | Touch wake from deep sleep, `rotateScreen180` | ⏳ Not yet tested on the fork |
 | Mesh Node / Core operation with a coordinator | ⏳ Not yet tested (switching modes works) |
 
@@ -124,7 +125,7 @@ The pin map lives in `Arduino Files/Piglet/PinMapDefs.h` and is selected automat
 
 ## Touch Button
 
-The **NEXT** button runs down the upper-right corner of the screen, beside the page. The two small lines under it are a reminder of the current page's extra gestures.
+The **NEXT** button sits at the bottom-right of the screen, at the end of the status strip. The two small lines under it are a reminder of the current page's extra gestures.
 
 ### Gestures
 
@@ -145,12 +146,28 @@ Multi-tap taps must each follow the previous one within 350 ms. Only the Status 
 |---|---|---|---|---|
 | 0 | **Status** | Play/pause icon, GPS indicator, STA and SD state, 2.4 / 5 GHz counts, battery, speed, IP or AP countdown, upload progress | `2x:` `pause` / `resume` | ✅ Active unless paused |
 | 1 | **Networks** | 2.4 GHz, 5 GHz and total network counts | `hold:` `sleep` | ✅ Active |
-| 2 | **Navigation** | Compass arrow, heading, speed; `No Fix` and satellite dots without a fix | `hold:` `sleep` | ✅ Active |
+| 2 | **Navigation** | Compass arrow, heading, speed; `No Fix` and satellite dots without a fix. GPS status in the bottom strip (see below) | `hold:` `sleep` | ✅ Active |
 | 3 | **Paused** | `Scan paused` | `hold:` `sleep` | ❌ Stopped while on this page |
 | 4 | **Pig** | Walking pig animation 🐷 | `2x oink` `3x sq` | ✅ Active |
 | 5 | **Mesh** | Node: link state, coordinator MAC, channel range, ESP-Now channel, Found count. Core: node count and list, GPS state | `hold:` `core` / `node` | ↔ Forwarded via ESP-Now |
 
 Leaving the Status page clears a double-tap pause. Entering the Mesh page always starts in Node mode.
+
+
+### Screen layout and GPS status
+
+The page fills the top of the screen at 2× size. A white divider separates it from the **status strip** along the bottom, with NEXT at the strip's right end.
+
+On the **Navigation** page the strip shows the GPS state, refreshed every half second; on other pages it is blank:
+
+| Headline | Meaning | Second line |
+|---|---|---|
+| 🔴 `GPS: NO DATA` | No bytes from the GPS for 3 s — wiring, power, or the wrong RX pin | `Check TX->GPIO12` |
+| 🟠 `GPS: GARBLED` | Mostly checksum failures — usually the wrong baud rate | `Check baud 9600` |
+| 🟡 `GPS: SEARCHING` | Valid data, no fix yet | `N sats in view` |
+| 🟢 `GPS: FIX` | Position fix | `N sats HDOP x.x` |
+
+Below that: NMEA sentences passing / failing checksum (`ok` / `bad`), bytes received and time since the last byte (`rx … last …`), and the position — or, without a fix, how long since the last fix or since boot.
 
 
 ## First Time Run Initialization
