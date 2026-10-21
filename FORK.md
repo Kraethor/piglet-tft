@@ -147,7 +147,10 @@ Size-1 grey text was tried first and was unreadable outdoors.
 - The status page's play/pause glyph includes `statusPagePaused`. Upstream
   leaves it out, so the double-press pause never showed on screen.
 
-Both upstream bugs, the triple press and the glyph, also affect stock Piglet.
+The glyph bug also affects stock Piglet, and is reported upstream. The triple
+press is not an upstream bug: it works on stock Piglet's physical button, and
+only touch taps are too slow for the first-release window (checked on a stock
+unit, 2026-10-21).
 
 ### Deep sleep
 

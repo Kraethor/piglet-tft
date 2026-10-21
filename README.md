@@ -10,7 +10,7 @@ Everything else — Wi-Fi scanning, GPS, WiGLE CSV logging to SD, the web UI, up
 - **Display:** ILI9341 TFT via [Arduino_GFX](https://github.com/moononournation/Arduino_GFX), sharing the SD card's SPI bus. The panel runs in landscape (320×240). The stock pages are drawn unchanged at 2× size across the top (320×128, phase 1). Below a divider, a status strip across the bottom shows the GPS state on the Navigation page; a full-screen colour layout is planned (phase 2).
 - **Input:** the physical button is replaced by an on-screen **NEXT** button at the right end of the bottom strip. It drives the same single / double / triple / long-press gestures, and a two-line hint under NEXT shows what the current page's extra gestures do.
 - **Faster taps:** pages without multi-tap gestures change on release, with no double-tap wait.
-- **Two inherited button bugs fixed:** the status page's play/pause icon now shows a double-tap pause, and triple-tap is reachable (the multi-press window now runs from the latest tap, not the first).
+- **Button fixes:** the status page's play/pause icon now shows a double-tap pause (a bug inherited from upstream), and triple-tap is reachable with touch (the multi-press window now runs from the latest tap, not the first).
 - **Wake from deep sleep** moves from the button to a screen touch (the XPT2046 IRQ line).
 
 Implementation notes and the phase-1/phase-2 plan are in [`FORK.md`](FORK.md). Changes are on the **`tft`** branch; `main` mirrors upstream.

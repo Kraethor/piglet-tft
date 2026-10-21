@@ -27,9 +27,9 @@ First fork release. **XIAO ESP32-C5 only.**
 #### Improvements
 - **Faster taps** — pages without multi-tap gestures (1, 2, 3, 5) change page on release instead of waiting 350 ms for a possible double tap, and a page change redraws immediately instead of on the next 500 ms refresh.
 
-#### Bug Fixes (both also present in upstream v2.7)
-- **Status-page double-press pause wasn't shown** — the play/pause icon ignored the status-page pause flag, so it stayed on ▶ while scanning was paused. It now shows ⏸ and redraws at once.
-- **Triple press was effectively unreachable** — the multi-press window ran 350 ms from the *first* release, so all three presses had to fit inside it. It now runs from the latest release, and isn't evaluated while a follow-up press is still held.
+#### Bug Fixes
+- **Status-page double-press pause wasn't shown** (also present in upstream v2.7) — the play/pause icon ignored the status-page pause flag, so it stayed on ▶ while scanning was paused. It now shows ⏸ and redraws at once.
+- **Triple press was effectively unreachable with touch** — the multi-press window ran 350 ms from the *first* release, so all three presses had to fit inside it. Stock Piglet's physical button manages this, so it isn't an upstream bug; touch taps are slower. It now runs from the latest release, and isn't evaluated while a follow-up press is still held.
 
 #### Pin map (C5)
 - TFT CS / DC / RST on D0 / D1 / D2, touch CS / IRQ on D4 / D5, shared SPI bus on D8 / D9 / D10. The OLED (D4 / D5) and the button (D1) are removed. GPS and SD wiring are unchanged.
