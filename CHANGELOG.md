@@ -1,5 +1,39 @@
 # Changelog
 
+## Piglet-TFT (fork)
+
+Fork releases are named `v<upstream version>-tft`, and each is based on that upstream release. The upstream changelog continues below, unchanged.
+
+### v2.7-tft (2026-10-21) — based on upstream v2.7
+
+First fork release. **XIAO ESP32-C5 only.**
+
+#### Display and input
+- **ILI9341 2.8" TFT (240×320) replaces the SSD1306 OLED**, driven by Arduino_GFX on the SD card's SPI bus, with its own CS, DC and RESET lines. The stock pages are drawn unchanged into a 128×64 canvas centred on the panel, through an SSD1306-compatible shim (`TftCompat.h`).
+- **XPT2046 resistive touch replaces the physical button.** An on-screen **NEXT** button in the bottom-right corner feeds the existing gesture state machine, so tap, double tap, triple tap and hold all still work.
+- **Hint line under NEXT** showing the current page's extra gestures: `2x: pause` / `2x: resume`, `hold: sleep`, `2x oink 3x sq`, `hold: core` / `hold: node`.
+- **Wake from deep sleep** is now a screen touch (XPT2046 IRQ on D5 / GPIO 24) instead of a button press.
+
+#### Improvements
+- **Faster taps** — pages without multi-tap gestures (1, 2, 3, 5) change page on release instead of waiting 350 ms for a possible double tap, and a page change redraws immediately instead of on the next 500 ms refresh.
+
+#### Bug Fixes (both also present in upstream v2.7)
+- **Status-page double-press pause wasn't shown** — the play/pause icon ignored the status-page pause flag, so it stayed on ▶ while scanning was paused. It now shows ⏸ and redraws at once.
+- **Triple press was effectively unreachable** — the multi-press window ran 350 ms from the *first* release, so all three presses had to fit inside it. It now runs from the latest release, and isn't evaluated while a follow-up press is still held.
+
+#### Pin map (C5)
+- TFT CS / DC / RST on D0 / D1 / D2, touch CS / IRQ on D4 / D5, shared SPI bus on D8 / D9 / D10. The OLED (D4 / D5) and the button (D1) are removed. GPS and SD wiring are unchanged.
+
+#### Libraries
+- Adds **GFX Library for Arduino** (`Arduino_GFX_Library`) and **XPT2046_Touchscreen**. **Adafruit SSD1306, Adafruit GFX and Adafruit BusIO** are no longer used.
+
+#### Not yet tested on the fork
+- SD logging, GPS fix, uploads, touch wake from deep sleep, `rotateScreen180`.
+
+---
+
+## Upstream Piglet
+
 ## v2.7 (2026-10-13)
 
 ### New Features

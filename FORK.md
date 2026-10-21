@@ -1,104 +1,145 @@
-# Piglet-TFT — fork notes
+# Piglet-TFT — developer notes
 
-Fork of [hamspiced/piglet](https://github.com/hamspiced/piglet) (the ESP32 XIAO
-wardriver) that swaps the small I²C OLED + physical button for the 2.8" SPI TFT
-(ILI9341 240×320) + XPT2046 resistive touch already used by the `WifiScanner_v1`
-build. Same MCU as stock Piglet's C5 kit — a Seeed **XIAO ESP32-C5** — so this is
-a display/input change, not a board change.
+How the fork works inside, and how to keep it in step with upstream. For what
+the fork is, the wiring, the touch-button gestures and the build settings, see
+[`README.md`](README.md).
 
-Upstream and this fork share the GPS (ATGM336H, UART) and the SD card module (SPI)
-with identical wiring; only the display subsystem differs.
+All fork changes are in the main sketch, `Arduino Files/Piglet/`. Every other
+folder is unchanged from upstream.
 
-## Goal
+## Branches and upstream
 
-- Remove the SSD1306 OLED and the physical button.
-- Drive the ILI9341 TFT + XPT2046 touch over the **shared SD SPI bus**.
-- Replace the button's gesture vocabulary (single / double / triple / long press)
-  with an on-screen **touch button** living in a screen corner (temporary home),
-  reusing the existing gesture state machine unchanged.
+| Branch | Contents |
+|---|---|
+| `tft` *(default)* | The fork: upstream plus the TFT/touch changes |
+| `main` | An untouched mirror of [hamspiced/piglet](https://github.com/hamspiced/piglet) `main` |
 
-## Pin map (XIAO ESP32-C5) — see `Arduino Files/Piglet/PinMapDefs.h`
+To pick up a new upstream release:
 
-Shared SPI bus: SCK=D8/GPIO8, MOSI=D10/GPIO10, MISO=D9/GPIO9.
+```sh
+git remote add upstream https://github.com/hamspiced/piglet.git   # once
+git fetch upstream
+git checkout main && git merge --ff-only upstream/main && git push origin main
+git checkout tft  && git merge main
+```
 
-| Signal      | XIAO pad | GPIO  | Notes |
-|-------------|----------|-------|-------|
-| SD CS       | D3       | 7     | shared bus |
-| TFT CS      | D0       | 1     | shared bus |
-| TFT DC      | D1       | 0     | (was the physical button) |
-| TFT RESET   | D2       | 25    | |
-| Touch CS    | D4       | 23    | (was OLED SDA) |
-| Touch IRQ   | D5       | 24    | (was OLED SCL) — can wake from deep sleep |
-| GPS RX      | D7       | 12    | unchanged |
-| GPS TX      | D6       | 11    | unchanged |
+Expect conflicts in the files the fork has changed: `Display.cpp`, `Globals.*`,
+`Piglet.ino`, `PinMapDefs.h`, `TouchInput.*`, `TftCompat.h`. Upstream changes to
+the page-drawing code in `Display.cpp` and `MeshNode.cpp` usually carry straight
+over, because those pages still draw through the SSD1306 call surface (see
+below). After merging, set `FIRMWARE_VERSION` in `Globals.h` to
+`v<upstream>-tft` (for example `v2.8-tft`) and add a CHANGELOG entry. Further
+fork-only releases on the same upstream base add a counter: `v2.7-tft.2`,
+`v2.7-tft.3`, ….
 
-This is the same wiring as the author's earlier `WifiScanner_v1` TFT build.
+## Display: phase 1
 
-## Status — phase-1 implemented, built and running (2026-10-21)
+The stock pages (`Display.cpp`, `MeshNode.cpp`, splash and sleep screens) are
+written against the Adafruit_SSD1306 API on a 128×64 monochrome buffer. Phase 1
+leaves that code alone and runs it on the TFT through a small shim:
 
-- [x] Repo cloned; `build/` artifacts untracked.
-- [x] Pin map: C5 set to TFT+touch; OLED (`sda`/`scl`) and `btn` set to -1.
-- [x] Display backend: ILI9341 via Arduino_GFX (`Arduino_HWSPI` on `&SPI`).
-      `TftCompat.h` shims the SSD1306 call surface onto an Arduino_Canvas, so the
-      existing pages (`Display.cpp`, `MeshNode.cpp`, splash, sleep screen) render
-      unchanged — into a **128×64 framebuffer centered on the 240×320 panel**
-      (phase-1). Full-screen 240×320 redesign is phase-2.
-- [x] Touch input (`TouchInput.cpp`): XPT2046 polled on the shared bus; an
-      on-screen "NEXT" button in the bottom-right corner is fed into the existing
-      button gesture state machine (`pollButton()`), so single / double / triple /
-      long-press all still work from that one corner.
-- [x] Deep-sleep wake moved from the button pin to the touch IRQ (`pins.tch_irq`).
-- [x] Compile/flash verification — built and flashed onto a XIAO ESP32-C5
-      2026-10-21; TFT pages and all touch-button gestures tested on the device.
-      SD logging, GPS fix, uploads and touch wake from deep sleep not yet tested.
+- **`TftCompat.h`** defines `PigletDisplay`, an `Arduino_Canvas` of 128×64 that
+  adds the three SSD1306-only calls the pages use: `clearDisplay()` →
+  `fillScreen(black)`, `display()` → `flush()`, and `ssd1306_command()` → no-op.
+  `SSD1306_WHITE` / `SSD1306_BLACK` map to RGB565 white / black.
+- The canvas is flushed to a region **centred on the 240×320 panel**
+  (x = 56, y = 128), leaving black margins.
+- Everything else (`drawRect`, `print`, `setTextSize`, `getTextBounds`, …) is
+  inherited from Arduino_GFX, so the page code compiles unchanged.
 
-### Required libraries (add to the build)
+**RAM:** the 128×64×16 bpp canvas is about 16 KB, which fits comfortably without
+PSRAM. The fork is built and run with PSRAM disabled.
 
-- `Arduino_GFX_Library` (moononournation) — replaces TFT_eSPI.
-- `XPT2046_Touchscreen` (PaulStoffregen) — touch.
-- (`Adafruit_SSD1306` / `Adafruit_GFX` are no longer needed.)
+## Shared SPI bus
 
-### Phase-1 caveats to check on hardware
-
-- **UI is small and centered**, with black margins — expected for phase-1.
-- **Touch mapping is uncalibrated** (`TouchInput.cpp` uses a generous fixed
-  raw→pixel range). If the corner button misses, port `WifiScanner_v1`'s 2-point
-  calibration (raw min/max persisted to SD).
-- **Canvas RAM**: a 128×64×16bpp framebuffer is ~16 KB — fine without PSRAM, but
-  keep PSRAM on per upstream build notes. (A full-screen phase-2 canvas would be
-  ~150 KB and would need PSRAM.)
-- **Flush cadence**: pages redraw at 2 Hz (pig page faster); the corner button is
-  painted once at boot and persists because the canvas flush only repaints the
-  centered region.
-
-## Reference & proven approach (shared SPI — solved)
-
-The trickiest part is three SPI devices (TFT, SD, touch) sharing one bus with
-separate CS lines on the C5. The author's earlier `WifiScanner_v1` TFT build
-already solved it.
-
-Proven stack ported from it:
+The SD card, the ILI9341 and the XPT2046 share one SPI bus, each with its own CS
+line. What makes this work, in `Globals.cpp`:
 
 ```cpp
-#include <Arduino_GFX_Library.h>
-#include <XPT2046_Touchscreen.h>
-// Arduino_HWSPI rides the standard Arduino SPIClass (&SPI) — THIS is what lets
-// the SD card share the bus safely via its own CS line. Do NOT use
-// Arduino_ESP32SPI (raw-register) here; it would not share with SD.
-Arduino_DataBus *bus = new Arduino_HWSPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, TFT_MISO, &SPI, true /*shared*/);
-Arduino_GFX    *gfx  = new Arduino_ILI9341(bus, TFT_RST, 0 /*portrait*/, false /*not IPS*/);
-// IRQ deliberately NOT passed: keeps every touch call a true poll and avoids the
-// XPT2046_Touchscreen isrWake dead-touch trap.
-XPT2046_Touchscreen touch(TOUCH_CS);
+// Arduino_HWSPI rides the standard Arduino SPIClass (&SPI) — this is what lets
+// the SD card share the bus via its own CS line. Do NOT use Arduino_ESP32SPI
+// (raw-register); it would not share with SD.
+Arduino_DataBus *tftBus = new Arduino_HWSPI(
+    PINS_C5.tft_dc, PINS_C5.tft_cs,
+    PINS_C5.sd_sck, PINS_C5.sd_mosi, PINS_C5.sd_miso,
+    &SPI, true /* shared */);
+Arduino_GFX *gfx = new Arduino_ILI9341(tftBus, PINS_C5.tft_rst, 0, false);
+// IRQ deliberately NOT passed: every touch call is a true poll, which avoids
+// XPT2046_Touchscreen's isrWake "dead touch" trap.
+XPT2046_Touchscreen touch(PINS_C5.tch_cs);
 ```
 
 Piglet's SD code already calls `SPI.begin(sck, miso, mosi, cs)` on the global
-`SPI` and then `SD.begin(cs)`, so TFT + touch on `&SPI` coexist with it directly.
+`SPI` and then `SD.begin(cs)`, so the TFT and touch controller coexist with it.
+Before the display starts, `setup()` drives all three CS lines high so a
+floating CS can't corrupt the init transfers.
 
-Colors in Arduino_GFX are RGB565 (`RGB565_BLACK`, `RGB565_WHITE`, …), not the
-SSD1306 1-bit constants. Touch returns raw 0..4095; `WifiScanner_v1` maps raw→
-pixel via a 2-point calibration persisted to the SD card.
+**The display and touch objects are built from `PINS_C5` at static
+initialisation**, not from the runtime pin map. Changing pins in the config or
+web UI does not move the TFT or touch pins; edit `PINS_C5` in `PinMapDefs.h`.
 
-## Build note
+Arduino_GFX colours are RGB565 (`RGB565_BLACK`, `RGB565_WHITE`, …).
 
-See **Building Firmware** in `README.md` for board settings and flashing.
+## Touch input
+
+- **`TouchInput.cpp`** polls the XPT2046 and reports whether the **NEXT** button
+  zone (bottom-right, 86×60 px at x = 150, y = 256) is being touched, with a
+  minimum pressure of z ≥ 300.
+- **Uncalibrated:** raw readings are mapped linearly from 300–3800 to panel
+  pixels. That is accurate enough for one large corner button. Smaller phase-2
+  touch targets will need a two-point calibration, with raw min/max kept on the
+  SD card.
+- `pollButton()` in `Piglet.ino` feeds that pressed / not-pressed signal into
+  upstream's button gesture state machine as if it were the old `INPUT_PULLUP`
+  button (pressed = LOW). A 1.5 s settle window after boot ignores spurious
+  touches while the bus and panel come up.
+- **The NEXT button and its hint line are drawn directly on the panel**, outside
+  the canvas, so canvas flushes never overwrite them. `refreshTouchButton()`
+  redraws the button when its hint changes: on a page change, a status-page
+  pause toggle, and a mesh Core/Node switch.
+
+### Changes from upstream's gesture handling
+
+- Pages without multi-press gestures (1, 2, 3, 5) act on release instead of
+  waiting out `DOUBLE_PRESS_MS`, the 350 ms window (`pageHasMultiPress()`).
+- The multi-press window is measured from the **latest** release, not the first,
+  and isn't evaluated while a follow-up press is held. Upstream measures from the
+  first release, which makes a triple press almost impossible with touch.
+- A page change sets `pageRedrawPending`, so `loop()` redraws at once instead of
+  waiting for the next 500 ms refresh.
+- The status page's play/pause glyph includes `statusPagePaused`. Upstream
+  leaves it out, so the double-press pause never showed on screen.
+
+Both upstream bugs, the triple press and the glyph, also affect stock Piglet.
+
+### Deep sleep
+
+A 2 s hold on any page except the mesh page enters deep sleep. The wake source
+is the XPT2046 IRQ line (`pins.tch_irq`, D5 / GPIO 24), which goes low while the
+panel is touched. *Not yet tested on hardware.*
+
+## Status
+
+- [x] Pin map: C5 set to TFT + touch; OLED (`sda` / `scl`) and `btn` set to -1.
+- [x] ILI9341 via Arduino_GFX on the shared bus; stock pages render through `TftCompat.h`.
+- [x] Touch NEXT button driving the gesture state machine, with a page-specific hint line.
+- [x] Built and flashed on a XIAO ESP32-C5 (core 3.3.10); TFT pages and all
+      touch gestures tested on the device (2026-10-21).
+- [ ] SD logging, GPS fix, WiGLE / WDGoWars / Wardrift uploads — not yet tested on the fork.
+- [ ] Touch wake from deep sleep — not yet tested.
+- [ ] `rotateScreen180` — not yet tested. It rotates the page canvas; the NEXT
+      button and the touch mapping do not appear to account for rotation (from
+      reading the code, not tested).
+
+## Phase 2 (planned)
+
+Redesign the pages for the full 240×320 colour panel instead of the centred
+128×64 canvas.
+
+- A full-screen 16 bpp canvas is about 150 KB. That likely needs PSRAM, or
+  partial / unbuffered redraws instead of a full framebuffer.
+- More, smaller touch targets will need the two-point touch calibration
+  described above.
+- The page code would move off the SSD1306 call surface. Upstream changes to
+  `Display.cpp` would then stop merging cleanly, so plan for upstream merges to
+  become manual.

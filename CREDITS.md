@@ -40,3 +40,22 @@ contributed by dagnazty and merged in v2.2.
 
 **Author:** Midwest Gadgets LLC  
 **License:** CC BY-NC-SA 4.0 — https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+---
+
+## Piglet-TFT Fork
+
+**Maintainer:** Kraethor ([@Kraethor](https://github.com/Kraethor))  
+**Repository:** https://github.com/Kraethor/piglet-tft
+
+Piglet-TFT is a modified version of Piglet by Midwest Gadgets LLC
+([hamspiced/piglet](https://github.com/hamspiced/piglet)). It replaces the OLED and
+button with an ILI9341 TFT and XPT2046 touch on the XIAO ESP32-C5, and changes the
+button handling. The changes are listed in [`CHANGELOG.md`](CHANGELOG.md). It is
+distributed under the same CC BY-NC-SA 4.0 license, and is not affiliated with
+or supported by Midwest Gadgets LLC.
+
+The fork's display and touch support uses:
+
+- **GFX Library for Arduino** by moononournation — https://github.com/moononournation/Arduino_GFX
+- **XPT2046_Touchscreen** by Paul Stoffregen — https://github.com/PaulStoffregen/XPT2046_Touchscreen
